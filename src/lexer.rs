@@ -183,22 +183,20 @@ impl<'a> Lexer<'a> {
             '/' => self.op_eq(Ty::Divide, Ty::DivideEqual),
             '%' => self.op_eq(Ty::Modulo, Ty::ModuloEqual),
             '!' => self.op_eq(Ty::Not, Ty::NotEqual),
-            '>' => {
+            '>' =>
                 if !self.eof() && self.chars[self.pos + 1] == '>' {
                     self.pos += 2;
                     self.op(Ty::BitRightShift)
                 } else {
                     self.op_eq(Ty::Greater, Ty::GreaterEqual)
-                }
-            },
-            '<' => {
+                },
+            '<' =>
                 if !self.eof() && self.chars[self.pos + 1] == '<' {
                     self.pos += 2;
                     self.op(Ty::BitLeftShift)
                 } else {
                     self.op_eq(Ty::Lesser, Ty::LesserEqual)
-                }
-            },
+                },
             '=' => self.op_eq(Ty::Assign, Ty::Equal),
             '^' => self.op_eq(Ty::BitXor, Ty::BitXorEqual),
 
