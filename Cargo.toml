@@ -17,5 +17,5 @@ codegen-units = 1
 panic = "abort"
 
 [[bench]]
-name = "bench"
+name = "bench" 
 harness = false
