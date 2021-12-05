@@ -10,4 +10,12 @@ edition = "2021"
 [dev-dependencies]
 criterion = "^0.3.5"
 
+[profile.release]
+lto = "fat"
+codegen-units = 1
+# lowers size of file but can cause problems with some libraries
+panic = "abort"
 
+[[bench]]
+name = "bench"
+harness = false
