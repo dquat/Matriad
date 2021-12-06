@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Ty {
@@ -154,7 +156,10 @@ impl<'a> Lexer<'a> {
         }
         let char = self.chars[self.pos];
         match char {
-            c if c.is_whitespace() => self.op(Ty::Whitespace),
+            c if c.is_whitespace() => {
+                self.pos += 1;
+                Some((Ty::Whitespace, SC::C(c)))
+            },
 
             c if c.is_digit(10) => {
                 let mut seen_dot = false;
@@ -183,20 +188,30 @@ impl<'a> Lexer<'a> {
             '/' => self.op_eq(Ty::Divide, Ty::DivideEqual),
             '%' => self.op_eq(Ty::Modulo, Ty::ModuloEqual),
             '!' => self.op_eq(Ty::Not, Ty::NotEqual),
-            '>' =>
-                if !self.eof() && self.chars[self.pos + 1] == '>' {
-                    self.pos += 2;
-                    self.op(Ty::BitRightShift)
+            '>' => {
+                self.pos += 1;
+                if !self.eof() && self.chars[self.pos] == '=' {
+                    self.pos += 1;
+                    Some((Ty::GreaterEqual, SC::Null)) // >=
+                } else if !self.eof() && self.chars[self.pos] == '>' {
+                    self.pos += 1;
+                    Some((Ty::BitRightShift, SC::Null)) // >>
                 } else {
-                    self.op_eq(Ty::Greater, Ty::GreaterEqual)
-                },
-            '<' =>
-                if !self.eof() && self.chars[self.pos + 1] == '<' {
-                    self.pos += 2;
-                    self.op(Ty::BitLeftShift)
+                    Some((Ty::Greater, SC::Null)) // >
+                }
+            },
+            '<' => {
+                self.pos += 1;
+                if !self.eof() && self.chars[self.pos] == '=' {
+                    self.pos += 1;
+                    Some((Ty::LesserEqual, SC::Null)) // <=
+                } else if !self.eof() && self.chars[self.pos] == '<' {
+                    self.pos += 1;
+                    Some((Ty::BitLeftShift, SC::Null)) // <<
                 } else {
-                    self.op_eq(Ty::Lesser, Ty::LesserEqual)
-                },
+                    Some((Ty::Lesser, SC::Null)) // <
+                }
+            },
             '=' => self.op_eq(Ty::Assign, Ty::Equal),
             '^' => self.op_eq(Ty::BitXor, Ty::BitXorEqual),
 
