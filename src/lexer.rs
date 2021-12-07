@@ -1,79 +1,76 @@
-use std::borrow::Cow;
-use std::sync::{Arc, Mutex};
-use std::thread;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Ty {
-    Whitespace, // \t \n \r <space>
-    Identifier, // [a-zA-Z_][a-zA-Z0-9_]*
-    Number, // [0-9]* ('.' [0-9]*)?
+    Whitespace,      // \t \n \r <space>
+    Identifier,      // [a-zA-Z_][a-zA-Z0-9_]*
+    Number,          // [0-9]* ('.' [0-9]*)?
 
     // operators
-    Plus, // +
-    PlusEqual, // +=
+    Plus,            // +
+    PlusEqual,       // +=
 
-    Minus, // -
-    MinusEqual, // -=
+    Minus,           // -
+    MinusEqual,      // -=
 
-    Divide, // /
-    DivideEqual, // /=
+    Divide,          // /
+    DivideEqual,     // /=
 
-    Multiply, // *
-    MultiplyEqual, // *=
+    Multiply,        // *
+    MultiplyEqual,   // *=
 
-    Modulo, // %
-    ModuloEqual, // %=
+    Modulo,          // %
+    ModuloEqual,     // %=
 
-    Not, // !
-    NotEqual, // !=
+    Not,             // !
+    NotEqual,        // !=
 
-    Equal, // ==
-    Assign, // =
+    Equal,           // ==
+    Assign,          // =
 
-    Greater, // >
-    GreaterEqual, // >=
+    Greater,         // >
+    GreaterEqual,    // >=
 
-    Lesser, // <
-    LesserEqual, // <=
+    Lesser,          // <
+    LesserEqual,     // <=
 
-    Exponent, // **
-    ExponentEqual, // **=
+    Exponent,        // **
+    ExponentEqual,   // **=
 
-    And, // &&
-    BitAnd, // &
-    BitAndEqual, // &=
+    And,             // &&
+    BitAnd,          // &
+    BitAndEqual,     // &=
 
-    Or, // ||
-    BitOr, // |
-    BitOrEqual, // |=
+    Or,              // ||
+    BitOr,           // |
+    BitOrEqual,      // |=
 
-    BitLeftShift, // <<
-    BitRightShift, // >>
+    BitLeftShift,    // <<
+    BitRightShift,   // >>
 
-    BitXor, // ^
-    BitXorEqual, // ^=
+    BitXor,          // ^
+    BitXorEqual,     // ^=
 
-    Range, // ..
-    Dot, // .
+    Range,           // ..
+    Dot,             // .
 
     // delimiters
-    Comma, // ,
-    Colon, // :
-    Semicolon, // ;
+    Comma,           // ,
+    Colon,           // :
+    Semicolon,       // ;
 
-    LeftBracket, // [
-    RightBracket, // ]
+    LeftBracket,     // [
+    RightBracket,    // ]
 
-    RightParen, // )
-    LeftParen, // (
+    RightParen,      // )
+    LeftParen,       // (
 
-    LeftBrace, // {
-    RightBrace, // }
+    LeftBrace,       // {
+    RightBrace,      // }
 
     // invalid
-    Invalid, // anything else at all
+    Invalid,         // anything else at all
 }
 
+// used to reduce the need to convert to string, every time a token is generated
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SC {
     C(char),
@@ -81,15 +78,14 @@ pub enum SC {
     Null,
 }
 
-pub struct Lexer<'a> {
-    pub src   : Cow<'a, str>,
+pub struct Lexer {
     pub pos   : usize,
     pub chars : Vec<char>,
 }
 
-impl<'a> Lexer<'a> {
+impl Lexer {
 
-    pub fn new(src: &'a str) -> Self {
+    pub fn new(src: &str) -> Self {
         let mut char_vec = Vec::with_capacity(src.len());
         src
             .chars()
@@ -97,7 +93,6 @@ impl<'a> Lexer<'a> {
                 char_vec.push(c)
             );
         Lexer {
-            src   : Cow::Borrowed(src),
             pos   : 0,
             chars : char_vec,
         }
