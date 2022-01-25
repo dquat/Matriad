@@ -3,19 +3,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 #[path = "../src/language/lexer.rs"]
 mod lexer;
 
-#[path = "../src/language/util.rs"]
-mod util;
-use util::SArr;
-
 pub fn chars(c: &mut Criterion) {
-    // c.bench_function("extend", |b| {
-    //     b.iter(|| {
-    //         let mut arr = black_box(SArr::<usize, 10>::new());
-    //         arr.extend_slice_clone(&[1usize, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    //         black_box(arr.clear());
-    //     });
-    // });
-
+    // test out the speed of the lexer
+    // currently standing at about 2.600us(microseconds, 1,000,000th of a second) per iteration,
+    // and this is 415 chars in length. = ~160MB/s of data lexed on an i7-6500U
     c.bench_function("chars", |b| {
         let src = r#"// a random set of random code (comment)
         /* nother comment */

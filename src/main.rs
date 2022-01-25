@@ -8,6 +8,7 @@ use language::message::Msg;
 use language::util::Span;
 use crate::language::message::MsgType;
 
+// unused
 fn _black_box<T>(dummy: T) -> T {
     unsafe {
         let ret = std::ptr::read_volatile(&dummy);
@@ -16,6 +17,7 @@ fn _black_box<T>(dummy: T) -> T {
     }
 }
 
+// test code stuff
 fn main() {
     let src = "\ntada bada\n\n\nbooom boom mooob\n soosunsuen nshhe dje jeiei";
     let rng = Span::from_range(11..22);

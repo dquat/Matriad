@@ -1,6 +1,11 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::slice::Iter;
 
+// a small implementation of an array based vector
+// it is about 6x faster than Vec, when the size is known
+// overflow is not supported
+// data: An array of a constant size<br/>
+// len: The size of the array
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SArr<T, const SIZE: usize> {
     data : [T; SIZE],
@@ -134,6 +139,9 @@ impl<T, const SIZE: usize> SArr<T, SIZE> {
     pub fn len(&self) -> usize { self.len }
 }
 
+// a simple span of lines, or a start and end position
+// start: The start of the span<br/>
+// end  : The end of the span<br/>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Span {
     pub start : usize,

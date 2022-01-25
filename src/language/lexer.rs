@@ -1,3 +1,4 @@
+// had to use a horrible path import to make the lexer work with criterion
 #[path="../language/token.rs"]
 mod token;
 
@@ -8,6 +9,7 @@ use std::ops::Range;
 use std::str::{CharIndices, Chars};
 use /*crate::language::*/token::{Token, SC, Ty};
 
+// a lexer for the language
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     pub src   : Cow<'a, str>,

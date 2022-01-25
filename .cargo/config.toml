@@ -1,2 +1,4 @@
 [build]
 rustflags = ["--emit=asm", "-C", "target-cpu=native"]
+# emit asm offers almost a 15% boost in speed
+# target-cpu=native offers a marginal boost in speed (on an intel i7-6500U at-least)
