@@ -1,5 +1,6 @@
 # The Unnamed-language
 - suggest a name for me lol, I can't think of one
+- Maybe "Corrul"?
 ---
 # Prerequisites
 - [Rust](https://www.rust-lang.org/) must be installed, version 1.58 or greater
