@@ -1,4 +1,4 @@
-/target
-/.idea
+/target/
+/.idea/
 Cargo.lock
-language.iml
+corul.iml

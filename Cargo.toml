@@ -1,8 +1,8 @@
 [package]
-name    = "language"
+name    = "corul"
 version = "0.1.0"
 edition = "2021"
-email   = "user.some1@outlook.com"
+# email = "user.some1@outlook.com"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

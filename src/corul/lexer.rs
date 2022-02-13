@@ -1,5 +1,5 @@
 // had to use a horrible path import to make the lexer work with criterion
-#[path="../language/token.rs"]
+#[path="../corul/token.rs"]
 mod token;
 
 // imports
@@ -7,9 +7,9 @@ use std::borrow::{Borrow, Cow};
 use std::iter::Peekable;
 use std::ops::Range;
 use std::str::{CharIndices, Chars};
-use /*crate::language::*/token::{Token, SC, Ty};
+use /*crate::corul::*/token::{Token, SC, Ty};
 
-// a lexer for the language
+// a lexer for the corul programming language
 #[derive(Debug, Clone)]
 pub struct Lexer<'a> {
     pub src   : Cow<'a, str>,

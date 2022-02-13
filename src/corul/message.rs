@@ -2,7 +2,7 @@
 // imports
 use std::borrow::{Cow};
 use std::fmt::{Display, Formatter};
-use crate::language::util::Span;
+use crate::corul::util::Span;
 
 /// A structure for visualizing the message range, based off of the source code.<br/>
 /// This is used for displaying error, warning and information messages.<br/>
@@ -43,7 +43,7 @@ impl<'a> Clone for Visualizer<'a> {
 impl<'a> Visualizer<'a> {
     pub fn new(src: &'a str, start: usize, end: usize, label: &'a str) -> Self {
         let mut span = Span::new(start, end);
-        // swap is end is greater than start
+        // swap if end is greater than start
         if span.start > span.end  { span.swap(); }
         Self {
             src   : Cow::Borrowed(src),
@@ -55,7 +55,7 @@ impl<'a> Visualizer<'a> {
     }
 
     pub fn new_span(src: &'a str, mut span: Span, label: &'a str) -> Self {
-        // swap is end is greater than start
+        // swap if end is greater than start
         if span.start > span.end  { span.swap(); }
         Self {
             src   : Cow::Borrowed(src),
@@ -75,19 +75,39 @@ impl<'a> Visualizer<'a> {
             // the variable that is used to check if the starting line was modified
             mut modified_start,
             // the variable that is used to check if the ending line was modified
-            mut modified_end
-        ) = (false, false);
+            mut modified_end,
+            mut was_empty
+        ) = (false, false, false);
         let mut mod_src = String::with_capacity(self.span.len());
         for (i, ln) in self.src.lines().enumerate() {
+            let cc = ln.chars().count();
             // add the current line count, if it's 0, it means it's a newline, add that too
-            line_len += match ln.chars().count() { 0 if modified_start => 1, c => c };
+            line_len +=
+                match cc {
+                    0 => 1,
+                    c => {
+                        if was_empty {
+                            let diff = i - self.lines.start;
+                            self.lines.start = i;
+                            self.lines.end += match diff { 0 => 0, d => d - 1 };
+                            was_empty = false;
+                        }
+                        c
+                    }
+                };
             // if the line count exceeds or equals the start position, then this is the start line
             if line_len >= self.span.start && !modified_start {
+                if cc == 0 { was_empty = true; }
                 self.lines.start = i;
                 self.span.start -= prev_line_len;
                 self.span.end   -= prev_line_len;
                 modified_start = true;
             }
+            // // add the new-range source
+            // if modified_start && !modified_end {
+            //     mod_src.push_str(ln);
+            //     mod_src.push('\n');
+            // }
             // if the line count exceeds or equals the end position, then this is the end line
             if line_len >= self.span.end && !modified_end {
                 self.lines.end = i;

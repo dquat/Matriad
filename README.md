@@ -1,6 +1,5 @@
-# The Unnamed-language
-- suggest a name for me lol, I can't think of one
-- Maybe "Corrul"?
+# The Corul programming language
+- I've decided on using `Corul` as the name for the language
 ---
 # Prerequisites
 - [Rust](https://www.rust-lang.org/) must be installed, version 1.58 or greater
@@ -11,7 +10,7 @@
 Clone the source-code using git like so:
 ```bash
 # git must be installed!
-git clone https://github.com/dquat/unnamed-language.git
+git clone https://github.com/dquat/corul.git
 ```
 # Execution
 - This language is still not complete to the point where it's usable

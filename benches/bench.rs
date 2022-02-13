@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-#[path = "../src/language/lexer.rs"]
+#[path = "../src/corul/lexer.rs"]
 mod lexer;
 
 pub fn chars(c: &mut Criterion) {
