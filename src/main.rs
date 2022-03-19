@@ -1,13 +1,14 @@
-#![allow(warnings, unused)]
+#![allow(warnings, unused)] // temporarily disable warnings for development
 extern crate crossterm;
 
-mod corul;
+mod matriad;
 
 use std::borrow::BorrowMut;
-use corul::message::Visualizer;
-use corul::message::Msg;
-use corul::util::Span;
-use crate::corul::message::MsgType;
+use std::time::{ Duration, Instant };
+use matriad::message::Visualizer;
+use matriad::message::Msg;
+use matriad::util::Span;
+use crate::matriad::message::MsgType;
 
 // unused
 fn _black_box<T>(dummy: T) -> T {
@@ -20,6 +21,11 @@ fn _black_box<T>(dummy: T) -> T {
 
 // test code stuff
 fn main() {
+    let mut lex = lexer_new::Lexer::new(r#""sp\rs""#);
+    while let Some(next) = lex.next() {
+        println!("{next}");
+    }
+
     let src = "\ntada bada\n\n\nbooom boom mooob\n soosunsuen nshhe dje jeiei";
     let rng = Span::from_range(11..22);
     println!("{:?}", &src[rng.range()]);
@@ -33,5 +39,13 @@ fn main() {
     dbg!(&vis);
     println!("{vis}");
     println!("{:?}", &vis.range[vis.span.range()]);
-    println!("{:?}", get_ast());
+}
+
+fn bench(mut func: impl FnMut(), num: u32) {
+    let time = Instant::now();
+    for i in 0..num {
+        func();
+    }
+    println!("Elapsed: {:?}", time.elapsed());
+    println!("Single iteration: {:?}", time.elapsed() / num);
 }

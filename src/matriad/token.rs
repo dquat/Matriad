@@ -122,8 +122,18 @@ impl Clone for SC<'_> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Token<'a>(pub Ty, pub SC<'a>, pub usize, pub usize);
 
+impl Default for Token<'_> {
+    fn default() -> Self {
+        Token(Ty::Invalid, SC::Null, 0, 0)
+    }
+}
+
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Token(Type = {}, Value = {}, Start = {}, End = {})", self.0, self.1, self.2, self.3)
+        write!(
+            f,
+            "Token(Type = {}, Value = {}, Start = {}, End = {})",
+            self.0, self.1, self.2, self.3
+        )
     }
 }

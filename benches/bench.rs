@@ -1,12 +1,12 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{ black_box, criterion_group, criterion_main, Criterion };
 
-#[path = "../src/corul/lexer.rs"]
+#[path = "../src/matriad/lexer.rs"]
 mod lexer;
 
 pub fn chars(c: &mut Criterion) {
     // test out the speed of the lexer
-    // currently standing at about 2.600us(microseconds, 1,000,000th of a second) per iteration,
-    // and this is 415 chars in length. = ~160MB/s of data lexed on an i7-6500U
+    // currently standing at about 2.95us (microseconds, 1,000,000th of a second) per iteration,
+    // and this is 415 chars in length = ~140MB/s of data lexed on an i7-6500U
     c.bench_function("chars", |b| {
         let src = r#"// a random set of random code (comment)
         /* nother comment */

@@ -1,8 +1,11 @@
-# The Corul programming language
-- I've decided on using `Corul` as the name for the language
+![Matriad Logo](./matriad_name_dark.svg#gh-dark-mode-only)
+![Matriad Logo](./matriad_name_light.svg#gh-light-mode-only)
+# The Matriad programming language
+- Corul was the previous name of the language
+- Now it is Matriad
 ---
 # Prerequisites
-- [Rust](https://www.rust-lang.org/) must be installed, version 1.58 or greater
+- [Rust](https://www.rust-lang.org/) must be installed, version 1.59.0 or greater
   - Installing cargo for [rust](https://www.rust-lang.org/) is also recommended
   - You can install both cargo and the rust compiler with [rustup](https://rustup.rs/)
 -  [Git](https://git-scm.com/) must be installed if you want to download the source code through the terminal
@@ -10,7 +13,7 @@
 Clone the source-code using git like so:
 ```bash
 # git must be installed!
-git clone https://github.com/dquat/corul.git
+git clone https://github.com/dquat/Matriad.git
 ```
 # Execution
 - This language is still not complete to the point where it's usable
@@ -19,7 +22,7 @@ git clone https://github.com/dquat/corul.git
 This language aims to be a language that is:
 - Easy to learn and use
 - Performant and efficient
-- Almost as powerful as Rust or C++
+- Almost, or equally powerful as Rust or C++
 - Fun to read and write 
   - syntax sugar to help make code shorter, and easier to read
 - Feature complete 

@@ -1,23 +1,23 @@
 [package]
-name    = "corul"
+name    = "matriad"
 version = "0.1.0"
 edition = "2021"
 # email = "user.some1@outlook.com"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "^0.22.1" # cross platform terminal-interaction library
+crossterm = "0.23.0" # cross platform terminal-interaction library
 
 [dev-dependencies]
 criterion = "^0.3.5" # performance benchmarking library
 
 [profile.release]
-debug = true # enable debug mode (for profiling)
+#debug = true # enable debug mode (for profiling)
 lto = "fat" # link-time optimization, slow build time, and marginal peformance improvements
 # codegen-units = 1 # increases the performance marginally on my device
 # lowers size of file and may lower performance but can cause problems with some libraries
 # panic = "abort" # lowers performance on my device by about 100ns on the lexer
 
 [[bench]]
-name = "bench"
+name    = "bench"
 harness = false

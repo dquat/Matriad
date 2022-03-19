@@ -1,8 +1,8 @@
 // modules
 pub mod token;
 pub mod message;
-pub mod lexer;
 pub(crate) mod util;
+pub mod lexer;
 
 // imports
 use std::thread;

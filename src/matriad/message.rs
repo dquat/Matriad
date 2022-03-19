@@ -2,7 +2,7 @@
 // imports
 use std::borrow::{Cow};
 use std::fmt::{Display, Formatter};
-use crate::corul::util::Span;
+use crate::matriad::util::Span;
 
 /// A structure for visualizing the message range, based off of the source code.<br/>
 /// This is used for displaying error, warning and information messages.<br/>

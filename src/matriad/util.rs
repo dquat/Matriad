@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{ Debug, Display, Formatter };
 use std::slice::Iter;
 
 // a small implementation of an array based vector
@@ -6,6 +6,7 @@ use std::slice::Iter;
 // overflow is not supported
 // data: An array of a constant size<br/>
 // len: The size of the array
+// unused in the project, for now
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SArr<T, const SIZE: usize> {
     data : [T; SIZE],
@@ -164,11 +165,9 @@ impl Span {
     pub fn len(&mut self) -> usize {
         if self.end == self.start {
             0
-        }
-        else if self.end >= self.start {
+        } else if self.end >= self.start {
             self.end - self.start
-        }
-        else {
+        } else {
             self.start - self.end
         }
     }
