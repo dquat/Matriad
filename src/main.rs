@@ -21,7 +21,8 @@ fn _black_box<T>(dummy: T) -> T {
 
 // test code stuff
 fn main() {
-    let mut lex = lexer_new::Lexer::new(r#""sp\rs""#);
+    let mut lex = matriad::lexer::Lexer::new(r#"test "strng" "\u{1234}" // comment
+/* /* nested */ comment */ 192.32 23.21 1"#);
     while let Some(next) = lex.next() {
         println!("{next}");
     }

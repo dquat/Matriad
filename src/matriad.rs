@@ -32,11 +32,9 @@ pub fn compile(source: String) {
                 let _token = token;
                 // println!("{}", token);
             }
-            if let Some(&(i, _)) = lexer.it.peek() {
-                let send = trx.try_recv();
-                if send.is_err() {
-                    itx.send(i).ok();
-                }
+            let send = trx.try_recv();
+            if send.is_err() {
+                itx.send(lexer.pos).ok();
             }
         }
         dtx.send(()).ok();

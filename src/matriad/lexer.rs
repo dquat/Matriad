@@ -6,9 +6,9 @@ use std::str::Chars;
 use crate::matriad::token::*;
 
 pub struct Lexer<'a> {
-    src : &'a str,
-    pos : usize,
-    it  : Peekable<Chars<'a>>
+    pub src : &'a str,
+    pub pos : usize,
+    pub it  : Peekable<Chars<'a>>
 }
 
 impl<'a> Lexer<'a> {
@@ -39,8 +39,8 @@ impl<'a> Lexer<'a> {
     }
 
     // unused
-    // #[inline]
-    // pub fn eof(&mut self) -> bool { self.it.peek().is_none() }
+    #[inline]
+    pub fn eof(&mut self) -> bool { self.it.peek().is_none() }
 
     fn tk(&mut self, ty: Ty) -> Option<Token> {
         let start = self.pos;
