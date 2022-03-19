@@ -1,5 +1,5 @@
-![Matriad Logo](./https://raw.githubusercontent.com/dquat/Matriad/main/matriad_name_dark.svg#gh-light-mode-only)
-![Matriad Logo](./https://raw.githubusercontent.com/dquat/Matriad/main/matriad_name_light.svg#gh-dark-mode-only)
+![Matriad Logo](https://raw.githubusercontent.com/dquat/Matriad/main/matriad_name_dark.svg#gh-light-mode-only)
+![Matriad Logo](https://raw.githubusercontent.com/dquat/Matriad/main/matriad_name_light.svg#gh-dark-mode-only)
 # The Matriad programming language
 - Corul was the previous name of the language
 - Now it is Matriad
