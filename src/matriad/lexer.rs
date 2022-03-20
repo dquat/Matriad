@@ -3,7 +3,11 @@ use std::iter::Peekable;
 use std::ops::Range;
 use std::str::Chars;
 
-use crate::matriad::token::*;
+#[path="./token.rs"]
+mod token;
+use token::*;
+
+// use crate::matriad::token::*;
 
 pub struct Lexer<'a> {
     pub src : &'a str,
@@ -208,7 +212,7 @@ impl<'a> Lexer<'a> {
             c if c.is_whitespace() => {
                 let start = self.pos;
                 self.adv();
-                Some(Token(Ty::Invalid, SC::Chr(c), start, self.pos))
+                Some(Token(Ty::Whitespace, SC::Chr(c), start, self.pos))
             },
 
             // get strings

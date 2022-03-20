@@ -21,25 +21,27 @@ fn _black_box<T>(dummy: T) -> T {
 
 // test code stuff
 fn main() {
-    let mut lex = matriad::lexer::Lexer::new(r#"test "strng" "\u{1234}" // comment
-/* /* nested */ comment */ 192.32 23.21 1"#);
-    while let Some(next) = lex.next() {
-        println!("{next}");
-    }
 
-    let src = "\ntada bada\n\n\nbooom boom mooob\n soosunsuen nshhe dje jeiei";
-    let rng = Span::from_range(11..22);
-    println!("{:?}", &src[rng.range()]);
-    let mut vis = Visualizer::new_span(src, rng, "Main visualizer");
-    dbg!(&vis);
-    println!("{vis}");
-    vis
-        .compute_lines();
-        // .compute_whitespace();
-    // vis.wrap(15, 0, &mut exclude);
-    dbg!(&vis);
-    println!("{vis}");
-    println!("{:?}", &vis.range[vis.span.range()]);
+    let compiler = matriad::compile("hello world".repeat(1_000_000));
+//     let mut lex = matriad::lexer::Lexer::new(r#"test "strng" "\u{1234}" // comment
+// /* /* nested */ comment */ 192.32 23.21 1"#);
+//     while let Some(next) = lex.next() {
+//         println!("{next}");
+//     }
+//
+//     let src = "\ntada bada\n\n\nbooom boom mooob\n soosunsuen nshhe dje jeiei";
+//     let rng = Span::from_range(11..22);
+//     println!("{:?}", &src[rng.range()]);
+//     let mut vis = Visualizer::new_span(src, rng, "Main visualizer");
+//     dbg!(&vis);
+//     println!("{vis}");
+//     vis
+//         .compute_lines();
+//         // .compute_whitespace();
+//     // vis.wrap(15, 0, &mut exclude);
+//     dbg!(&vis);
+//     println!("{vis}");
+//     println!("{:?}", &vis.range[vis.span.range()]);
 }
 
 fn bench(mut func: impl FnMut(), num: u32) {
