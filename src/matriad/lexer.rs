@@ -3,11 +3,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use std::str::Chars;
 
-#[path="./token.rs"]
-mod token;
-use token::*;
-
-// use crate::matriad::token::*;
+use crate::matriad::token::*;
 
 pub struct Lexer<'a> {
     pub src : &'a str,
