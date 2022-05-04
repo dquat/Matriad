@@ -2,7 +2,17 @@
 // imports
 use std::borrow::{Cow};
 use std::fmt::{Display, Formatter};
+use crossterm::style::Stylize;
 use crate::matriad::util::Span;
+
+/// A structure to hold pointer data, including where it should be located and
+/// what kind of pointer character should be used
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Pointer<'a> {
+    pub pointer  : char,
+    pub span     : Span,
+    pub message  : Option<&'a str>,
+}
 
 /// A structure for visualizing the message range, based off of the source code.<br/>
 /// This is used for displaying error, warning and information messages.<br/>
@@ -20,120 +30,104 @@ use crate::matriad::util::Span;
 ///  - |    |            and another message here
 ///  - |    a message here
 /// </pre>
-#[derive(Debug, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, PartialEq)]
 pub struct Visualizer<'a> {
-    pub src   : Cow<'a, str>,
-    pub range : Cow<'a, str>,
-    pub span  : Span,
-    pub lines : Span,
-    pub label : &'a str,
+    pub src      : Cow<'a, str>,
+    pub span     : Span,
+    pub lines    : Span,
+    pub label    : &'a str,
+    pub exclude  : Vec<usize>,
+    pub pointers : Vec<Pointer<'a>>,
 }
 
 impl<'a> Clone for Visualizer<'a> {
     fn clone(&self) -> Self {
         Self {
-            // only clone the source, better performance
-            src   : self.src  .clone(),
-            range : self.range.clone(),
+            // Only clone some parts, better performance
+            src      : self.src     .clone(),
+            exclude  : self.exclude .clone(),
+            pointers : self.pointers.clone(),
             ..*self
         }
     }
 }
 
 impl<'a> Visualizer<'a> {
-    pub fn new(src: &'a str, start: usize, end: usize, label: &'a str) -> Self {
-        let mut span = Span::new(start, end);
+    pub fn new(
+        src        : &'a str,
+        start      : usize,
+        end        : usize,
+        line_start : usize,
+        line_end   : usize,
+        label      : &'a str,
+    ) -> Self {
+        let mut span  = Span::new(start, end);
+        let mut lines = Span::new(line_start, line_end);
         // swap if end is greater than start
-        if span.start > span.end  { span.swap(); }
+        if span.start > span.end   { span .swap(); }
+        if lines.start > lines.end { lines.swap(); }
         Self {
-            src   : Cow::Borrowed(src),
-            range : Cow::Borrowed(""),
-            lines : Span::new(0, 0),
+            src      : Cow::Borrowed(src),
+            exclude  : Vec::new(),
+            pointers : Vec::new(),
+            lines,
             span,
-            label
+            label,
         }
     }
 
-    pub fn new_span(src: &'a str, mut span: Span, label: &'a str) -> Self {
+    pub fn new_span(
+        src       : &'a str,
+        mut span  : Span,
+        mut lines : Span,
+        label     : &'a str,
+    ) -> Self {
         // swap if end is greater than start
-        if span.start > span.end  { span.swap(); }
+        if span.start > span.end   { span .swap(); }
+        if lines.start > lines.end { lines.swap(); }
         Self {
-            src   : Cow::Borrowed(src),
-            range : Cow::Borrowed(""),
-            lines : Span::new(0, 0),
+            src      : Cow::Borrowed(src),
+            exclude  : Vec::new(),
+            pointers : Vec::new(),
+            lines,
             span,
-            label
+            label,
         }
     }
-    /// computes the line range of the message, as well as removing excess newline from the start
-    /// and the end locations
-    pub fn compute_lines(&mut self) -> &mut Self {
-        // current length of the lines, till the cursor, to check if it exceeds the start position
-        // or the end position and update the variables accordingly
-        let (mut line_len, mut prev_line_len) = (0, 0);
-        let (
-            // the variable that is used to check if the starting line was modified
-            mut modified_start,
-            // the variable that is used to check if the ending line was modified
-            mut modified_end,
-            mut was_empty
-        ) = (false, false, false);
-        let mut mod_src = String::with_capacity(self.span.len());
-        for (i, ln) in self.src.lines().enumerate() {
-            let cc = ln.chars().count();
-            // add the current line count, if it's 0, it means it's a newline, add that too
-            line_len +=
-                match cc {
-                    0 => 1,
-                    c => {
-                        if was_empty {
-                            let diff = i - self.lines.start;
-                            self.lines.start = i;
-                            self.lines.end += match diff { 0 => 0, d => d - 1 };
-                            was_empty = false;
-                        }
-                        c
-                    }
-                };
-            // if the line count exceeds or equals the start position, then this is the start line
-            if line_len >= self.span.start && !modified_start {
-                if cc == 0 { was_empty = true; }
-                self.lines.start = i;
-                self.span.start -= prev_line_len;
-                self.span.end   -= prev_line_len;
-                modified_start = true;
+
+    pub fn show(&self) -> String {
+        // create string to store the new message
+        let mut string = String::with_capacity(self.span.len());
+        let mut add_exclude = 0usize;
+        let max_len = self.lines.end.to_string().len();
+        // loop through lines
+        for (line, val) in self.src.lines().enumerate() {
+            if line < self.lines.start { continue; }
+            if line > self.lines.end { break; }
+            let val_checked =
+                if val.trim().is_empty() { "<empty>".bold().blue() }
+                else                     { val             .red () };
+            if self.exclude.contains(&line) {
+                let str = format!("{}- | {}\n", " ".repeat(max_len - 1), val_checked);
+                let str = str.as_str();
+                string.push_str(str);
+                add_exclude += 1;
+            } else {
+                let num = line - add_exclude;
+                let num_len = num.to_string().len();
+                let str =
+                    format!("{}{} | {}\n", " ".repeat(max_len - num_len), num, val_checked);
+                let str = str.as_str();
+                string.push_str(str);
             }
-            // // add the new-range source
-            // if modified_start && !modified_end {
-            //     mod_src.push_str(ln);
-            //     mod_src.push('\n');
-            // }
-            // if the line count exceeds or equals the end position, then this is the end line
-            if line_len >= self.span.end && !modified_end {
-                self.lines.end = i;
-                modified_end = true;
-            }
-            prev_line_len = line_len;
         }
-        self.src
-            .lines()
-            .skip(self.lines.start)
-            .take(self.lines.len() + 1)
-            .for_each(
-                |ln| {
-                    mod_src.push_str(ln);
-                    mod_src.push('\n');
-                }
-            );
-        mod_src.pop();
-        self.range = Cow::Owned(mod_src);
-        self
+        string
     }
 
     pub fn compute_whitespace(&mut self) -> &mut Self {
-        let (span, start, end) = (self.span, self.span.start, self.span.end);
-        // if the span is empty, do nothing
-        if end == start { return self; }
+        let (start, end) = (self.span.start, self.span.end);
+        // if the span is empty or there are no tabs, do nothing
+        if end == start || self.src.matches('\t').count() == 0 { return self; }
         // calculate number of tabs from starting of source, to starting of message and compensate
         let start_disp =
             &self.src
@@ -146,21 +140,20 @@ impl<'a> Visualizer<'a> {
             &self.src
                 .chars()
                 .skip(self.span.start)
-                .take(self.span.end - self.span.start)
+                .take(self.span.len())
                 .filter(|c| *c == '\t')
                 .count() * 3;
         // push the message span, to compensate converting the tabs to spaces
         self.span.start += start_disp;
         self.span.end   += start_disp + end_disp;
-        self.src         = Cow::Owned(self.src.replace("\t", "    "));
+        self.src         = Cow::Owned(self.src.replace('\t', "    "));
         self                                                       //  ^^^^ <- 4 spaces = 1 tab
     }
 
     pub fn wrap(
         &mut self,
         max_width   : usize,
-        mut padding : usize,
-        exclude     : &mut Vec<usize>
+        mut padding : usize
     ) -> &mut Self {
         let (mut start, mut end) = (self.span.start, self.span.end);
         // if padding is more than max width, subtracting will cause an overflow, so we use
@@ -168,20 +161,15 @@ impl<'a> Visualizer<'a> {
         if padding > max_width { padding = 0; }
         // add a bit of padding if needed to get the actual width
         let width = max_width - padding;
-        let (
-            // stores the new lines generated by the wrapping
-            mut new_lines,
-            // stores the current character index. used to push the start and end locations if
-            // the line is too long, and we add a newline
-            mut curr_i
-        ) = (
-            Vec::with_capacity(
-                self.src
+        // holds the newly generated lines
+        let mut new_lines = Vec::with_capacity(
+            self.src
                     .matches('\n')
                     .count()
-            ),
-            0
         );
+        // stores the current character index. used to push the start and end locations if
+        // the line is too long, and we add a newline
+        let mut curr_i = 0;
         let mut offset = 0; // offset index (moves when newline characters are added)
         for (i, line) in self.src.lines().enumerate() {
             let len = line.len();
@@ -211,12 +199,12 @@ impl<'a> Visualizer<'a> {
                     current += width;
                     // exclude the line from numbering when displaying when un_number is true,
                     // i.e. we are not at the first line to wrap
-                    if un_number { exclude.push(offset + i); }
+                    if un_number { self.exclude.push(offset + i); }
                     offset += 1; // line number push offset
                     // push the start and end locations by 1 to compensate for the newline to add
                     match current + curr_i {
                         c if c <= start             => { start += 1; end += 1; },
-                        c if c >= start && c <= end =>               end += 1,
+                        c if c >  start && c <= end =>               end += 1,
                         _                           => ()
                     }
                     // add the newline and push the string to the main line we're modifying
@@ -245,14 +233,12 @@ impl<'a> Visualizer<'a> {
 
 impl<'a> Display for Visualizer<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let label =
-            if self.label.is_empty() {
-                String::new()
-            } else {
-                format!("{}:\n", self.label)
-            };
-        // TODO: set this to display later
-        write!(f, "{}{:?}", label, self.range)
+        write!(f,
+               "{}{}{}",
+               self.label,
+               if !self.label.is_empty() { ":\n" } else { "" },
+               self.show()
+        )
     }
 }
 
@@ -262,7 +248,7 @@ impl<'a> Display for Visualizer<'a> {
 /// `MsgType::WeakWarning`<br/> `MsgType::Information`<br/>
 /// Implements [`Clone`], [`Copy`], [`Debug`], [`Display`],
 /// [`Default`], [`Eq`], [`PartialEq`], [`Hash`]<br/>
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MsgType {
     Information,
     WeakWarning,
@@ -294,7 +280,7 @@ impl Display for MsgType {
 /// message `S0:` [`Clone`] + [`Display`]: The actual message to display to the user<br/>
 /// file `S1:` [`Clone`] + [`Display`]: The file that this message's source file corresponds to<br/>
 /// Implements [`Debug`], [`Display`], [`Default`], [`Clone`], [`Eq`], [`PartialEq`], [`Hash`]<br/>
-#[derive(Debug, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, PartialEq)]
 pub struct Msg<'a, S0: Clone + Display, S1: Clone + Display> {
     pub message  : S0,
     pub file     : S1,

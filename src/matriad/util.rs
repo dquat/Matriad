@@ -1,13 +1,13 @@
 use std::fmt::{ Debug, Display, Formatter };
 use std::slice::Iter;
 
-// a small implementation of an array based vector
-// it is about 6x faster than Vec, when the size is known
-// overflow is not supported
+// A small implementation of an array (stack) based vector.
+// It is about 6x faster than Vec, when the size is known.
+// Overflow is not supported
 // data: An array of a constant size<br/>
 // len: The size of the array
 // unused in the project, for now
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SArr<T, const SIZE: usize> {
     data : [T; SIZE],
     len  : usize,
@@ -140,10 +140,12 @@ impl<T, const SIZE: usize> SArr<T, SIZE> {
     pub fn len(&self) -> usize { self.len }
 }
 
-// a simple span of lines, or a start and end position
-// start: The start of the span<br/>
-// end  : The end of the span<br/>
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+/// A simple span of lines, or a start and end position
+///
+/// start: The start of the span
+///
+/// end: The end of the span
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Span {
     pub start : usize,
     pub end   : usize,
@@ -154,6 +156,7 @@ impl Span {
         Self { start, end }
     }
 
+    #[inline]
     pub fn range(&self) -> std::ops::Range<usize> {
         self.start..self.end
     }
@@ -162,17 +165,29 @@ impl Span {
         Self { start: range.start, end: range.end }
     }
 
-    pub fn len(&mut self) -> usize {
+    pub fn len(&self) -> usize {
         if self.end == self.start {
             0
         } else if self.end >= self.start {
-            self.end - self.start
+            self.end   - self.start
         } else {
             self.start - self.end
         }
     }
 
+    #[inline]
     pub fn swap(&mut self) {
         std::mem::swap(&mut self.start, &mut self.end);
+    }
+
+    #[inline]
+    pub fn to_src<'a>(&self, src: &'a str) -> &'a str {
+        &src[self.range()]
+    }
+}
+
+impl Display for Span {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}..{}", self.start, self.end)
     }
 }

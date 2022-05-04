@@ -8,16 +8,13 @@ edition = "2021"
 [dependencies]
 crossterm = "0.23.0" # cross platform terminal-interaction library
 
-[dev-dependencies]
-criterion = "^0.3.5" # performance benchmarking library
-
 [profile.release]
-#debug = true # enable debug mode (for profiling)
-lto = "fat" # link-time optimization, slow build time, and marginal peformance improvements
-# codegen-units = 1 # increases the performance marginally on my device
-# lowers size of file and may lower performance but can cause problems with some libraries
-# panic = "abort" # lowers performance on my device by about 100ns on the lexer
+# Mess with `lto`, `codegen-units` and `panic` settings.
+# They sometimes cause performance improvements when enabled or disabled
 
-[[bench]]
-name    = "bench"
-harness = false
+lto           = "fat" # link-time optimization, slow build time, and marginal peformance improvements
+codegen-units = 1 # increases the performance marginally on my device?
+# lowers size of file and may change performance but can cause problems with some libraries
+panic         = "abort" # improves performance now?
+
+# debug = true # enable debug mode (for profiling)

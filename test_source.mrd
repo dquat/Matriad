@@ -1,0 +1,30 @@
+// This is an extremely detailed comment
+/// These are your provided docs
+/**
+    These are your docs,
+    but on more lines
+*/
+/* This is a stray comment */
+const TESTO: f64 = 1.12e-11;
+fn main() -> Result<()> {
+    let mut unused = {
+        1 + 2 - (1.19 | 1.0 & 2.10) as usize + unidentified~identifier#1 / 1 * 2 ** (!true as usize)
+        >> 2 + 9 << 3
+    };
+    unused += 1.19 as usize;
+    unused..unused;
+    unused.remove();
+    if TESTO.as_usize() == 1.1 {
+        let str = r##"
+            test str
+            "bleh"
+            "bar"
+            "foo"
+            "baz"
+        "##;
+        let str = str + "AaAA";
+        let bytes = b"wut?";
+        let byte_r = br#"ooh," ahh"#;
+        char::is_whitespace(str[0]);
+    }
+}
