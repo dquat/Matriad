@@ -360,11 +360,12 @@ impl<'a> Lexer<'a> {
 
         // Used to peek, twice, where needed
         let mut clone = self.it.clone();
-
-        match clone.next().unwrap_or('\0') {
-            // We have reached the end of the file
-            '\0' => None,
-
+        // Check for EOF
+        let next = clone.next();
+        if next.is_none() { return None; }
+        // If not EOF, we can safely unwrap the character
+        let next = next.unwrap();
+        match next {
             // Lex whitespace
             c if Self::is_whitespace(c) => {
                 self.take_while(Self::is_whitespace);
