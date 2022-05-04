@@ -1,15 +1,15 @@
 use std::fmt::{ Debug, Display, Formatter };
 use std::slice::Iter;
 
-// A small implementation of an array (stack) based vector.
-// It is about 6x faster than Vec, when the size is known.
-// Overflow is not supported
-// data: An array of a constant size<br/>
-// len: The size of the array
-// unused in the project, for now
+/// A small implementation of an array (stack) based vector.
+/// It is about 6x faster than Vec, when the size is known.
+/// Overflow is not supported, but underflow is allowed
+/// unused in the project, for now
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SArr<T, const SIZE: usize> {
+    /// This is an array of constant size that holds the data in the array
     data : [T; SIZE],
+    /// The length of the array that is essentially "occupied" by valid elements
     len  : usize,
 }
 
@@ -141,13 +141,11 @@ impl<T, const SIZE: usize> SArr<T, SIZE> {
 }
 
 /// A simple span of lines, or a start and end position
-///
-/// start: The start of the span
-///
-/// end: The end of the span
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct Span {
+    /// The start location that the span references in the source
     pub start : usize,
+    /// The end location that the span references in the source
     pub end   : usize,
 }
 

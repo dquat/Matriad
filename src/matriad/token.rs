@@ -242,20 +242,18 @@ impl Display for Set {
     }
 }
 
-/// The token struct.
+/// The token struct
 ///
 /// Stores the type and location data of each token so that it can later by analyzed by the parser
 /// or any other later step used in compiling the code
-///
-/// set -> Token type
-///
-/// pos -> Position Index
-///
-/// lines -> Line Index
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token{
+    /// The token type, here called a set because parts of my keyboard is broken and it's harder to
+    /// type in "token_type" than "set"
     pub set   : Set,
+    /// The position indexes referenced by the token
     pub pos   : Span,
+    /// All the lines which this token spans
     pub lines : Span,
 }
 

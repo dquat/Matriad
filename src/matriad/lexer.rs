@@ -5,10 +5,16 @@ use std::str::Chars;
 use crate::matriad::token::*;
 use crate::matriad::util::Span;
 
+/// The Lexer that lexes a given source and generates a token based off of the source
+/// every time it's [Lexer::next](`next`) function is called
 #[derive(Clone, Debug)]
 pub struct Lexer<'a> {
+    /// The current position of the lexer, relative to the length of the source
     pub pos  : usize,
+    /// The current line of the lexer, relative to the number of lines present in the source
     pub line : usize,
+    /// The [`Chars`] iterator generated from the source that is used to generate and identify
+    /// the type of token that the lexer will output in the [Lexer::next](`next`) function
     pub it   : Chars<'a>,
 }
 
