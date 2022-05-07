@@ -17,4 +17,4 @@ codegen-units = 1 # increases the performance marginally on my device?
 # lowers size of file and may change performance but can cause problems with some libraries
 panic         = "abort" # improves performance now?
 
-# debug = true # enable debug mode (for profiling)
+ debug = true # enable debug mode (for profiling)

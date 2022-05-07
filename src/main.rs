@@ -52,7 +52,7 @@ fn main() {
     /// Uncomment this to check lex speed for a sample input at `matriad/test_source.mrd`
     /// Some of the syntax is just there for fun and this not what the language will actually
     /// end up looking like
-    // lex_speed();
+    lex_speed();
 
     // Stuff for the message class I'm playing with
     let mut points =
@@ -88,7 +88,7 @@ fn bench(mut func: impl FnMut(), num: u32, samples: u32) -> Duration {
 
 /// Check the speed of the lexer
 fn lex_speed() {
-    // This test source gets lexed at approx. 270-280 MB/s on an i7-6500U CPU running Windows 10.
+    // This test source gets lexed at approx. 305-320 MB/s on an i7-6500U CPU running Windows 10.
     // Each source will get lexed at different speeds as not all sources contain the same number
     // of comments, numbers, strings etc.
     // But this should give you a general idea about it's average speed

@@ -117,12 +117,15 @@ impl<'a> Lexer<'a> {
 
     /// Creates a token from two characters if the check matched,
     /// or else just uses the current character and returns the token
+    #[inline]
     fn double(&mut self, no_matched: Set, matched: Set, check: char) -> Option<Token> {
         let (line, start) = (self.line, self.pos);
         self.adv_unchecked();
         let mut set = no_matched;
-        if self.peek() == check {
-            self.adv_unchecked();
+        let mut clone = self.it.clone();
+        if clone.next() == Some(check) {
+            self.it = clone;
+            self.pos += 1;
             set = matched;
         }
         Some(Token::new(
@@ -144,14 +147,23 @@ impl<'a> Lexer<'a> {
     ) -> Option<Token> {
         let (line, start) = (self.line, self.pos);
         self.adv_unchecked();
-        let peek = self.peek();
+        // let peek = self.peek();
+        let mut clone = self.it.clone();
         let mut set = no_matched;
-        if peek == check {
-            self.adv_unchecked();
-            set = matched1;
-        } else if peek == '=' {
-            self.adv_unchecked();
-            set = matched2;
+        match clone.next() {
+            Some(c) if c == check => {
+                self.it = clone;
+                self.pos += 1;
+                set = matched1;
+            },
+
+            Some('=') => {
+                self.it = clone;
+                self.pos += 1;
+                set = matched2;
+            },
+
+            _ => (),
         }
         Some(Token::new(
             set,
@@ -161,6 +173,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Same as [above](Lexer::triple) but adds one more check: `char check =`
+    #[inline]
     fn quadruple(
         &mut self,
         check      : char,
@@ -195,14 +208,32 @@ impl<'a> Lexer<'a> {
 
     // Used by the next function
     /// Checks for the start of an identifier
-    fn ident_start(c: char) -> bool { c.is_alphabetic() || c == '_' }
+    #[inline]
+    fn ident_start(c: char) -> bool {
+        match c {
+            'a'..='z' |
+            'A'..='Z' |
+            '_'       |
+            '~'       |
+            '#' => true,
+            _   => false,
+        }
+    }
 
     /// Checks if the identifier can "continue" being an identifier at that character
     #[inline]
     fn ident_continue(c: char) -> bool {
         // Some of these symbols may be removed later as the language progresses,
         // and cannot accommodate the symbols to be present in identifiers
-        c.is_alphanumeric() || matches!(c, '_' | '~' | '#')
+        match c {
+            'a'..='z' |
+            'A'..='Z' |
+            '0'..='9' |
+            '_'       |
+            '~'       |
+            '#' => true,
+            _   => false,
+        }
     }
 
     /// Takes a number (integer) where `_` and `0..9` are valid symbols
@@ -238,7 +269,7 @@ impl<'a> Lexer<'a> {
         // Check if the item was really closed
         let mut clone = self.it.clone();
         let closed =
-            if clone.next().unwrap_or('\0') == char_or_str {
+            if clone.next() == Some(char_or_str) {
                 // We know that the character is a single symbol as it's only used for parsing
                 // strings and characters in this lexer
                 self.pos += 1;
@@ -253,6 +284,7 @@ impl<'a> Lexer<'a> {
     /// Gets all the characters between `'` and `'`. This is meant to be only one symbol long,
     /// but that won't be checked here as we could have multiple characters between a
     /// Char type when using escape sequences, which are not parsed in this scope
+    #[inline]
     fn char(&mut self, set: CharSet) -> Option<Token> {
         let (line, start) = (self.line, self.pos);
         let closed = self.between('\'');
@@ -290,13 +322,18 @@ impl<'a> Lexer<'a> {
         }
         self.adv_unchecked();
         let mut end_hashes = 0;
+        let (mut max_hashes, mut prev_pos) = (0, self.pos);
+
         // Loop through the iterator till we find the ending hashes, or encounter an error
         loop {
             // Take the string between the hashes
             self.take_while(|c| c != '\"');
             // We found the end of file before the hashes were matched!
             if self.eof() {
-                return (start_hashes, RawStrErr::LacksHashes { lacking: start_hashes - end_hashes })
+                return (start_hashes, RawStrErr::LacksHashes {
+                    lacking : start_hashes - end_hashes,
+                    hint: (max_hashes, prev_pos)
+                })
             }
             // Consume the closing quote
             self.adv_unchecked();
@@ -320,31 +357,12 @@ impl<'a> Lexer<'a> {
             if start_hashes == end_hashes {
                 return (start_hashes, RawStrErr::NoError);
             }
+            else if end_hashes > max_hashes {
+                max_hashes = end_hashes;
+                prev_pos = end_start;
+            }
             // if not, continue looping till we find an error or the string closes
         }
-    }
-
-    /// Borrowed from the Rustc lexer, checks if a character is valid whitespace:
-    /// https://github.com/rust-lang/rust/blob/master/compiler/rustc_lexer/src/lib.rs#L245
-    #[inline]
-    fn is_whitespace(c: char) -> bool {
-        matches!(
-            c,
-            ' ' | '\n' | '\r' | '\t'
-            | '\u{000B}' // vertical tab
-            | '\u{000C}' // form feed
-
-            // NEXT LINE from latin1
-            | '\u{0085}'
-
-            // Bidi markers
-            | '\u{200E}' // LEFT-TO-RIGHT MARK
-            | '\u{200F}' // RIGHT-TO-LEFT MARK
-
-            // Dedicated whitespace characters from Unicode
-            | '\u{2028}' // LINE SEPARATOR
-            | '\u{2029}' // PARAGRAPH SEPARATOR
-        )
     }
 
     // The main function of this lexer
@@ -366,83 +384,26 @@ impl<'a> Lexer<'a> {
 
         // Used to peek, twice, where needed
         let mut clone = self.it.clone();
-        // Check for EOF
-        let next = clone.next();
-        if next.is_none() { return None; }
-        // If not EOF, we can safely unwrap the character
-        let next = next.unwrap();
-        match next {
+        // Lexes the next token based on the general number of the appearence of such symbols in code
+        match clone.next()? {
             // Lex whitespace
-            c if Self::is_whitespace(c) => {
-                self.take_while(Self::is_whitespace);
+            // char::is_whitespace is significantly faster than the previous method for whatever
+            // reason
+            c if char::is_whitespace(c) => {
+                self.take_while(char::is_whitespace);
                 tok!(Set::Whitespace)
             },
 
-            // Check for byte characters, byte strings, or raw byte strings
-            'b' => match clone.next().unwrap_or('\0') {
-                // This is a byte character
-                '\'' => {
-                    // Consume the `b` character
-                    self.adv_unchecked();
-                    self.char(CharSet::ByteChar)
-                },
+            // These delimiters occur quite a lot in most code, so they are checked for first
+            ')' => self.single(Set::LeftParen),
+            '(' => self.single(Set::RightParen),
 
-                // This is a byte string
-                '\"' => {
-                    // Consume the `b` character
-                    self.adv_unchecked();
-                    let closed = self.between('\"');
-                    tok!(Set::String { set: StrSet::ByteStr { closed } })
-                }
+            '}' => self.single(Set::LeftBracket),
+            '{' => self.single(Set::RightBracket),
 
-                // Found a raw byte string
-                'r' if matches!(clone.next().unwrap_or('\0'), '#' | '\"') => {
-                    // Advance twice to consume `br`
-                    self.adv_unchecked();
-                    self.adv_unchecked();
-                    let (hashes, mut err) = self.raw_str();
-                    // Try to convert hash number to a u8.
-                    // If it errors, we found too many hashes!
-                    match u8::try_from(hashes) {
-                        Ok(_) => (),
-                        _ => err = RawStrErr::ExcessHashes,
-                    };
-                    tok!(Set::String { set: StrSet::RawByteStr { hashes: hashes as u8, err } })
-                }
+            ';' => self.single(Set::Semicolon),
 
-                // Continue as a normal identifier
-                _ => self.ident(),
-            }
-
-            // Check for raw strings
-            'r' => match clone.next().unwrap_or('\0') {
-                // Found a raw string
-                '#' | '\"' => {
-                    // advance to consume the `r`
-                    self.adv_unchecked();
-                    let (hashes, mut err) = self.raw_str();
-                    // Try to convert hash number to a u8.
-                    // If it errors, we found too many hashes!
-                    match u8::try_from(hashes) {
-                        Ok(_) => (),
-                        _ => err = RawStrErr::ExcessHashes,
-                    };
-                    tok!(Set::String { set: StrSet::RawStr { hashes: hashes as u8, err } })
-                },
-
-                // Continue as a normal identifier
-                _ => self.ident(),
-            }
-
-            // This is a normal string
-            '\"' => {
-                let closed = self.between('\"');
-                tok!(Set::String { set: StrSet::Normal { closed } })
-            },
-
-            // This is a normal character
-            '\'' => self.char(CharSet::Normal),
-
+            // numbers and identifiers are also significant parts of code
             // Get numbers (hex, octal, binary, decimal or exponent)
             c @ '0'..='9' => {
                 let mut set = NumberSet::Normal;
@@ -560,18 +521,170 @@ impl<'a> Lexer<'a> {
                 }
             },
 
+            // Byte strings / chars and raw strings are even more rare than normal ones
+            // but they must be put before identifiers, or else they will never be parsed
+
+            // Check for raw strings
+            'r' => match clone.next() {
+                // Found a raw string
+                Some('#' | '\"') => {
+                    // advance to consume the `r`
+                    self.adv_unchecked();
+                    let (hashes, mut err) = self.raw_str();
+                    // Try to convert hash number to a u8.
+                    // If it errors, we found too many hashes!
+                    match u8::try_from(hashes) {
+                        Ok(_) => (),
+                        _ => err = RawStrErr::ExcessHashes,
+                    };
+                    tok!(Set::String { set: StrSet::RawStr { hashes: hashes as u8, err } })
+                },
+
+                // Continue as a normal identifier
+                _ => self.ident(),
+            }
+
+            // Check for byte characters, byte strings, or raw byte strings
+            'b' => match clone.next() {
+                // This is a byte character
+                Some('\'') => {
+                    // Consume the `b` character
+                    self.adv_unchecked();
+                    self.char(CharSet::ByteChar)
+                },
+
+                // This is a byte string
+                Some('\"') => {
+                    // Consume the `b` character
+                    self.adv_unchecked();
+                    let closed = self.between('\"');
+                    tok!(Set::String { set: StrSet::ByteStr { closed } })
+                }
+
+                // Found a raw byte string
+                Some('r') if matches!(clone.next(), Some('#' | '\"')) => {
+                    // Advance twice to consume `br`
+                    self.adv_unchecked();
+                    self.adv_unchecked();
+                    let (hashes, mut err) = self.raw_str();
+                    // Try to convert hash number to a u8.
+                    // If it errors, we found too many hashes!
+                    match u8::try_from(hashes) {
+                        Ok(_) => (),
+                        _ => err = RawStrErr::ExcessHashes,
+                    };
+                    tok!(Set::String { set: StrSet::RawByteStr { hashes: hashes as u8, err } })
+                }
+
+                // Continue as a normal identifier
+                _ => self.ident(),
+            }
+
             // Get identifiers & keywords
             c if Self::ident_start(c) => self.ident(),
 
-            // Operators and delimiters
+            // These are the significantly less used operators and delimiters
+            // so they are lower than other delimiters / operators
+            ']' => self.single(Set::LeftBrace),
+            '[' => self.single(Set::RightBrace),
+
             '.' => self.double(Set::Dot, Set::Range, '.'), // . | ..
             ':' => self.double(Set::Colon, Set::DoubleColon, ':'), // : | ::
             '+' => self.double(Set::Plus, Set::PlusEqual, '='), // + | +=
             '-' => self.double(Set::Minus, Set::MinusEqual, '='), // - | -=
             '=' => self.double(Set::Assign, Set::Equal, '='), // = | ==
             '!' => self.double(Set::Not, Set::NotEqual, '='), // ! |  !=
-            '%' => self.double(Set::Modulo, Set::ModuloEqual, '='), // % | %=
-            '^' => self.double(Set::BitXor, Set::BitXorEqual, '='), // ^ | ^=
+
+            // Comments and slashes usually consist of around 1/10 of most "proper" code
+            // This is a wild guess of course
+            '/' => {
+                // Consume the slash
+                self.adv_unchecked();
+                match self.peek() {
+                    // Single line comment
+                    // /// Doc comment
+                    // // Normal comment
+                    '/' => {
+                        // Consume the second slash
+                        self.adv_unchecked();
+                        let mut clone = self.it.clone();
+                        // Check if a third slash occurs. If so, it's a doc comment
+                        // If not, or a 4th slash occurs, it is not a doc comment
+                        let set = match clone.next() {
+                            Some('/') if clone.next() != Some('/') => CommentSet::Doc,
+                            _ => CommentSet::None,
+                        };
+                        self.take_while(|c| c != '\n');
+                        // Consume newline, or do nothing if eof
+                        self.adv();
+                        tok!(Set::SingleLineComment { set })
+                    }
+
+                    // Assuming that divide equal is more prominent than a multiline comment
+                    // but less prominent than a single line comment
+                    // /=
+                    '=' => {
+                        self.adv_unchecked();
+                        tok!(Set::DivideEqual)
+                    },
+
+                    // Multiline comment
+                    // /** Doc comment */
+                    // /* Normal */
+                    '*' => {
+                        self.adv_unchecked();
+                        let mut clone = self.it.clone();
+                        let set = match clone.next() {
+                            Some('*') if !matches!(clone.next(), Some('*' | '/')) =>
+                                CommentSet::Doc,
+                            _ => CommentSet::None,
+                        };
+                        // Parses multiline comments, layer by layer. Allows nested comments
+                        // Invalid comment: `/* /* */` (Nesting broken)
+                        let mut layer = 1usize;
+                        while let Some(c) = self.it.next() {
+                            self.pos += c.len_utf8();
+                            if c == '\n' { self.line += 1; }
+                            // We found a starting comment symbol, so increment nested layer
+                            let peek = self.peek();
+                            if c == '/' && peek == '*' {
+                                layer += 1;
+                            } else if c == '*' && peek == '/' {
+                                // We found a closing comment symbol, so decrement the nested layer
+                                layer -= 1;
+                                // If there are no layers that are incomplete, i.e. the layer is 0,
+                                // stop parsing the comment as we have reached the end
+                                if layer == 0 {
+                                    break;
+                                }
+                            }
+                        };
+                        // Consume closing slash in the comment, does nothing if eof
+                        // This could also have been put in the loop, but it makes little difference
+                        // where exactly this is put
+                        self.adv_unchecked();
+                        tok!(Set::MultiLineComment { set, closed: layer == 0 })
+                    }
+
+                    // /
+                    _ => tok!(Set::Divide)
+                }
+            }
+
+            // Strings and characters are usually scarce in normal code, with only a few lines
+            // containing a significant amount so these are low in the checks
+
+            // This is a normal string
+            '\"' => {
+                let closed = self.between('\"');
+                tok!(Set::String { set: StrSet::Normal { closed } })
+            },
+
+            // This is a normal character
+            '\'' => self.char(CharSet::Normal),
+
+            // These are quite scarce operators, but can be found in abundance in if statements
+            // and such other statements. I'm not sure weather this one should go higher or not
 
             '&' =>
                 self.triple(
@@ -616,6 +729,11 @@ impl<'a> Lexer<'a> {
                     Set::ExponentEqual
                 ), // * | ** | *= | **=
 
+            // These operators are hardly found in code, so they are very low in prominence
+
+            '%' => self.double(Set::Modulo, Set::ModuloEqual, '='), // % | %=
+            '^' => self.double(Set::BitXor, Set::BitXorEqual, '='), // ^ | ^=
+
             // These are pretty obvious in what they do, don't you think?
             '@' => self.single(Set::At),
             '#' => self.single(Set::Hash),
@@ -624,85 +742,11 @@ impl<'a> Lexer<'a> {
             '$' => self.single(Set::Dollar),
             '`' => self.single(Set::BackTick),
             '?' => self.single(Set::Question),
-            ';' => self.single(Set::Semicolon),
 
-            ']' => self.single(Set::LeftBrace),
-            '[' => self.single(Set::RightBrace),
-
-            ')' => self.single(Set::LeftParen),
-            '(' => self.single(Set::RightParen),
-
-            '}' => self.single(Set::LeftBracket),
-            '{' => self.single(Set::RightBracket),
-
-            '/' => {
-                // Consume the slash
-                self.adv_unchecked();
-                match self.peek() {
-                    // Single line comment
-                    // /// Doc comment
-                    // // Normal comment
-                    '/' => {
-                        // Consume the second slash
-                        self.adv_unchecked();
-                        let mut clone = self.it.clone();
-                        // Check if a third slash occurs. If so, it's a doc comment
-                        // If not, or a 4th slash occurs, it is not a doc comment
-                        let set = match clone.next() {
-                            Some('/') if clone.next() != Some('/') => CommentSet::Doc,
-                            _ => CommentSet::None,
-                        };
-                        self.take_while(|c| c != '\n');
-                        // Consume newline, or do nothing if eof
-                        self.adv();
-                        tok!(Set::SingleLineComment { set })
-                    }
-                    // Multiline comment
-                    // /** Doc comment */
-                    // /* Normal */
-                    '*' => {
-                        self.adv_unchecked();
-                        let mut clone = self.it.clone();
-                        let set = match clone.next() {
-                            Some('*') if !matches!(clone.next(), Some('*' | '/')) =>
-                                CommentSet::Doc,
-                            _ => CommentSet::None,
-                        };
-                        // Parses multiline comments, layer by layer. Allows nested comments
-                        // Invalid comment: `/* /* */` (Nesting broken)
-                        let mut layer = 1usize;
-                        while let Some(c) = self.it.next() {
-                            self.pos += c.len_utf8();
-                            if c == '\n' { self.line += 1; }
-                            // We found a starting comment symbol, so increment nested layer
-                            if c == '/' && self.peek() == '*' {
-                                layer += 1;
-                            } else if c == '*' && self.peek() == '/' {
-                                // We found a closing comment symbol, so decrement the nested layer
-                                layer -= 1;
-                                // If there are no layers that are incomplete, i.e. the layer is 0,
-                                // stop parsing the comment as we have reached the end
-                                if layer == 0 {
-                                    break;
-                                }
-                            }
-                        };
-                        // Consume closing slash in the comment, does nothing if eof
-                        // This could also have been put in the loop, but it makes little difference
-                        // where exactly this is put
-                        self.adv_unchecked();
-                        tok!(Set::MultiLineComment { set, closed: layer == 0 })
-                    }
-                    // /=
-                    '=' => {
-                        self.adv_unchecked();
-                        tok!(Set::DivideEqual)
-                    },
-
-                    // /
-                    _ => tok!(Set::Divide)
-                }
-            }
+            // Well, one hardly finds invalid characters in code unless it was intentionally
+            // put there so pretty obviously it is the lowest.
+            // Even if invalid characters existed in abundance, this one cannot be moved up since
+            // it can match any character, so anything below it won't run at all
 
             // An invalid character was found. Will later be converted to an error
             _ => {

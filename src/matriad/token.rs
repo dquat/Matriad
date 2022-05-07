@@ -36,9 +36,21 @@ pub enum CharSet {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawStrErr {
     /// Unexpected character between `r#` and `"`, i.e. something like `r#["Oh no!"#`
-    UnexpectedChar { unexpected: char },
+    UnexpectedChar {
+        /// The character that was unexpected
+        unexpected : char
+    },
     /// Less hashes on the right than what was given on the left: `r###"This is an error?"##`
-    LacksHashes { lacking: usize },
+    LacksHashes {
+        /// How many hashes is lacked
+        lacking : usize,
+        /// This is what the lexer guesses could be the ending of the raw string
+        /// 0. Maximum number of hashes that were encountered but could not close the string
+        /// When it is `0`, it means that no hashes were found anywhere after the start of the raw
+        /// string
+        /// 1. The position, where these hashes started
+        hint    : (usize, usize)
+    },
     /// More than 255 hashes provided. I mean, would you need more than 255 hashes in a raw string?
     /// Come on, nobody needs it
     ExcessHashes,
@@ -50,15 +62,31 @@ pub enum RawStrErr {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StrSet {
     /// A raw string where escape sequences loose their powers: `r#"str"#, r"hello\", r##"#"##`
-    RawStr { hashes: u8, err: RawStrErr },
+    RawStr {
+        /// The number of hashes. Maximum hashes must be u8::MAX
+        hashes : u8,
+        /// Any errors encountered by the lexer when trying to lex the given raw string
+        err    : RawStrErr
+    },
     /// A special raw string that does what [`StrSet::RawStr`] does and transforms
     /// it's characters into an array of numbers: `rb#"str"#, br"hello\", rb##"#"##`
-    RawByteStr { hashes: u8, err: RawStrErr },
+    RawByteStr {
+        /// The number of hashes. Maximum hashes must be u8::MAX
+        hashes : u8,
+        /// Any errors encountered by the lexer when trying to lex the given raw string
+        err    : RawStrErr
+    },
     /// A byte string that transforms it's characters into an array of numbers:
     /// `b"abc", b"str", b"hello"`
-    ByteStr { closed: bool },
+    ByteStr {
+        /// Weather or not the byte string was closed
+        closed : bool
+    },
     /// A very, very normal string: `"normal, completely normal"`, quite possibly too normal
-    Normal { closed: bool },
+    Normal {
+        /// Weather or not the normal string was closed
+        closed : bool
+    },
 }
 
 /// The token type, that the lexer returns
