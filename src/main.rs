@@ -52,7 +52,7 @@ fn main() {
     /// Uncomment this to check lex speed for a sample input at `matriad/test_source.mrd`
     /// Some of the syntax is just there for fun and this not what the language will actually
     /// end up looking like
-    lex_speed();
+    // lex_speed();
 
     // Stuff for the message class I'm playing with
     let mut points =
