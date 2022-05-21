@@ -682,7 +682,11 @@ impl<'a> Lexer<'a> {
                             let peek = self.peek();
                             if c == '/' && peek == '*' {
                                 layer += 1;
+                                // Consume the `*` symbol
+                                self.adv_unchecked();
                             } else if c == '*' && peek == '/' {
+                                // Consume the `/` symbol
+                                self.adv_unchecked();
                                 // We found a closing comment symbol, so decrement the nested layer
                                 layer -= 1;
                                 // If there are no layers that are incomplete, i.e. the layer is 0,
@@ -692,10 +696,6 @@ impl<'a> Lexer<'a> {
                                 }
                             }
                         };
-                        // Consume closing slash in the comment, does nothing if eof
-                        // This could also have been put in the loop, but it makes little difference
-                        // where exactly this is put
-                        self.adv_unchecked();
                         tok!(MultiLineComment { set, closed: layer == 0, depth: layer })
                     }
 

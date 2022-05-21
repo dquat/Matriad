@@ -33,7 +33,7 @@ fn main() {
 
     // Try it out! you'll get a beautiful error!
     // Please don't look at how I created it. You might just loose your eyes!
-    let src = "Hello.\n Welcome to this programmmmm /* Would you /* like */ \nto see an error?\n /* Sure thing! ";
+    let src = "Hello.\n Welcome to this programmmmm /*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*";
     let mut lexer = Lexer::new(src);
     let mut next = || lexer.next();
     let mut lexerror = LexThrow::new(&mut next, src);
