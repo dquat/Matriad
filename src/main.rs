@@ -4,68 +4,42 @@
 #![allow(warnings, unused)]
 
 extern crate crossterm;
+extern crate unicode_width;
 
 mod matriad;
 
-// uses
-use std::io::Write;
-use std::time::{ Duration, Instant };
+// Just for tests
+mod test;
+
+// imports
+use std::time::{
+    Duration,
+    Instant,
+};
+use crossterm::style::{Color, Stylize};
 use crate::matriad::lexer::Lexer;
+use crate::matriad::lexthrow::LexThrow;
 use crate::matriad::message::*;
 use crate::matriad::util::*;
 
-fn _point(points : &[(usize, &str)]) {
-    let mut prev = 0;
-    for i in 0..points.len() {
-        // We have encountered the same position
-        if points[i].0 + 1 == prev {
-            // We're at the end and we have encountered the same position as before
-            // Print this message too
-            if i + 1 == points.len() { print!("> {}", points[i].1); }
-            continue;
-        }
-        // Add required spaces
-        for _ in 0..(points[i].0 - prev) { print!(" "); }
-        // If we're at the end, print the message
-        // If not, we print an extender (`|`)
-        if i + 1 == points.len() { print!("{}", points[i].1); }
-        else { print!("|"); }
-        // Store the previously accessed location
-        prev = points[i].0 + 1;
-        std::io::stdout().flush().ok();
-    }
-}
-
-fn point(points : &mut [(usize, &str)]) {
-    points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    for i in 0..points.len() {
-        // Any padding to be applied to the left
-        print!("");
-        _point(&points[0..(points.len() - i)]);
-        // Print a newline
-        println!();
-    }
-}
-
 // Test code stuff
 fn main() {
-    /// Uncomment this to check lex speed for a sample input at `matriad/test_source.mrd`
-    /// Some of the syntax is just there for fun and this not what the language will actually
-    /// end up looking like
+    // Uncomment this to check lex speed for a sample input at `matriad/test_source.mrd`
+    // Some of the syntax is just there for fun and this not what the language will actually
+    // end up looking like
     // lex_speed();
 
     // Stuff for the message class I'm playing with
-    let mut points =
-        [
-            (1usize, "Ayo! Why did you do this, user?!"),
-            (5, "This error! Just wow."),
-            (11, "Did we just encounter 2 errors in one location?"),
-            (11, "YES. Yes we did"),
-            (14, "I'm last? Oh, yes I am. I'm the very last error!")
-        ];
-    println!("0123456789_123457890");
-    println!(" ^   ^     ^  ^");
-    point(&mut points);
+
+    // Try it out! you'll get a beautiful error!
+    // Please don't look at how I created it. You might just loose your eyes!
+    let src = "Hello.\n Welcome to this programmmmm /* Would you /* like */ \nto see an error?\n /* Sure thing! ";
+    let mut lexer = Lexer::new(src);
+    let mut next = || lexer.next();
+    let mut lexerror = LexThrow::new(&mut next, src);
+    for _ in 0..30 {
+        lexerror.next();
+    }
 }
 
 fn bench(mut func: impl FnMut(), num: u32, samples: u32) -> Duration {
@@ -83,12 +57,12 @@ fn bench(mut func: impl FnMut(), num: u32, samples: u32) -> Duration {
     println!("Total elapsed: {:?}", tot);
     let avg = (tot / 100) / num;
     println!("[max: {:?}, min: {:?}, avg: {:?}]", max / num, min / num, avg);
-    return avg;
+    avg
 }
 
 /// Check the speed of the lexer
 fn lex_speed() {
-    // This test source gets lexed at approx. 305-320 MB/s on an i7-6500U CPU running Windows 10.
+    // This test source gets lexed at approx. 285-295 MB/s on an i7-6500U CPU running Windows 10.
     // Each source will get lexed at different speeds as not all sources contain the same number
     // of comments, numbers, strings etc.
     // But this should give you a general idea about it's average speed

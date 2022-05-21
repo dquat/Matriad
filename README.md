@@ -7,7 +7,7 @@
   - Older versions of Rust may compile this code, but there are no guarantees, so it is recommended you use the latest version of Rust when compiling this program.
   - Installing cargo for [rust](https://www.rust-lang.org/) is also recommended
   - You can install both cargo and the rust compiler with [rustup](https://rustup.rs/)
-- [Git](https://git-scm.com/) must be installed if you want to download the source code through the terminal
+- [Git](https://git-scm.com/downloads) must be installed if you want to clone the source code 
 # Cloning
 Clone the source-code using git like so:
 ```bash

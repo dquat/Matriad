@@ -1,14 +1,22 @@
 // modules
-pub mod token;
+pub mod lexthrow;
 pub mod message;
-pub(crate) mod util;
+pub mod token;
 pub mod lexer;
+pub mod util;
+pub(self) mod config;
 
 // imports
-use std::thread;
-use std::sync::mpsc::channel;
-use std::time::{ Instant };
-use std::io::{ Write, stdout };
+use std::{
+    thread,
+    sync::mpsc::channel,
+    time::Instant,
+    io::{
+        Write,
+        stdout
+    }
+};
+
 use lexer::Lexer;
 
 fn progress<R: Copy + Send + 'static>(
@@ -20,9 +28,21 @@ fn progress<R: Copy + Send + 'static>(
 ) {
     use crossterm::{
         ExecutableCommand,
-        style::{ Color, SetForegroundColor, ResetColor, Attribute, SetAttribute },
-        cursor::{ Hide, Show },
-        terminal::{ Clear, ClearType }
+        style::{
+            Color,
+            SetForegroundColor,
+            ResetColor,
+            Attribute,
+            SetAttribute
+        },
+        cursor::{
+            Hide,
+            Show
+        },
+        terminal::{
+            Clear,
+            ClearType
+        }
     };
     let (itx, irx) = channel::<R>();
     let (dtx, drx) = channel::<()>();

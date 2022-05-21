@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "0.23.0" # cross platform terminal-interaction library
+crossterm     = "0.23.0" # cross platform terminal-interaction library
+unicode-width = "0.1.9" # library to test the width of unicode characters
 
 [profile.release]
 # Mess with `lto`, `codegen-units` and `panic` settings.

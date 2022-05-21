@@ -2,8 +2,19 @@
 
 use std::str::Chars;
 
-use crate::matriad::token::*;
-use crate::matriad::util::Span;
+use crate::matriad::{
+    token::{
+        lexer::{
+            Set::*,
+            *,
+        },
+        *,
+        Delimiters::*,
+    },
+    util::Span,
+};
+
+type OutToken = Token<Set>;
 
 /// The Lexer that lexes a given source and generates a token based off of the source
 /// every time it's [Lexer::next](`next`) function is called
@@ -88,10 +99,11 @@ impl<'a> Lexer<'a> {
     #[inline]
     fn adv_unchecked(&mut self) {
         match self.it.next() {
-            Some(v) => v,
+            Some(_) => {
+                self.pos += 1;
+            },
             None => return,
         };
-        self.pos += 1;
     }
 
     /// Peeks the iterator once
@@ -101,35 +113,21 @@ impl<'a> Lexer<'a> {
     /// Checks if the [`Lexer`] has reached the End Of File (EOF) yet, or not
     pub fn eof(&self) -> bool { self.it.clone().next().is_none() }
 
-    /// Creates a token from a single character
-    #[inline]
-    fn single(&mut self, set: Set) -> Option<Token> {
-        let (line, start) = (self.line, self.pos);
-        // Everywhere this is used, we know that the character
-        // that we are advancing to is a single symbol long
-        self.adv_unchecked();
-        Some(Token::new(
-            set,
-            Span::new(start, self.pos),
-            Span::new(line, self.line)
-        ))
-    }
-
     /// Creates a token from two characters if the check matched,
     /// or else just uses the current character and returns the token
     #[inline]
-    fn double(&mut self, no_matched: Set, matched: Set, check: char) -> Option<Token> {
+    fn double(&mut self, no_matched: Delimiters, matched: Delimiters, check: char) -> Option<OutToken> {
         let (line, start) = (self.line, self.pos);
         self.adv_unchecked();
-        let mut set = no_matched;
+        let mut delimiter = no_matched;
         let mut clone = self.it.clone();
         if clone.next() == Some(check) {
             self.it = clone;
             self.pos += 1;
-            set = matched;
+            delimiter = matched;
         }
-        Some(Token::new(
-            set,
+        Some(OutToken::new(
+            Delimiter(delimiter),
             Span::new(start, self.pos),
             Span::new(line, self.line)
         ))
@@ -141,32 +139,32 @@ impl<'a> Lexer<'a> {
     fn triple(
         &mut self,
         check      : char,
-        no_matched : Set, // char
-        matched1   : Set, // char check
-        matched2   : Set, // char =
-    ) -> Option<Token> {
+        no_matched : Delimiters, // char
+        matched1   : Delimiters, // char check
+        matched2   : Delimiters, // char =
+    ) -> Option<OutToken> {
         let (line, start) = (self.line, self.pos);
         self.adv_unchecked();
         // let peek = self.peek();
         let mut clone = self.it.clone();
-        let mut set = no_matched;
+        let mut delimiter = no_matched;
         match clone.next() {
             Some(c) if c == check => {
                 self.it = clone;
                 self.pos += 1;
-                set = matched1;
+                delimiter = matched1;
             },
 
             Some('=') => {
                 self.it = clone;
                 self.pos += 1;
-                set = matched2;
+                delimiter = matched2;
             },
 
             _ => (),
         }
-        Some(Token::new(
-            set,
+        Some(OutToken::new(
+            Delimiter(delimiter),
             Span::new(start, self.pos),
             Span::new(line, self.line)
         ))
@@ -177,30 +175,30 @@ impl<'a> Lexer<'a> {
     fn quadruple(
         &mut self,
         check      : char,
-        no_matched : Set, // char
-        matched1   : Set, // char check
-        matched2   : Set, // char =
-        matched3   : Set, // char check =
-    ) -> Option<Token> {
+        no_matched : Delimiters, // char
+        matched1   : Delimiters, // char check
+        matched2   : Delimiters, // char =
+        matched3   : Delimiters, // char check =
+    ) -> Option<OutToken> {
         let (line, start) = (self.line, self.pos);
         self.adv_unchecked();
         let peek = self.peek();
-        let mut set = no_matched;
+        let mut delimiter = no_matched;
         if peek == check {
             self.adv_unchecked();
             let peek = self.peek();
             if peek == '=' {
                 self.adv_unchecked();
-                set = matched3;
+                delimiter = matched3;
             } else {
-                set = matched1;
+                delimiter = matched1;
             }
         } else if peek == '=' {
             self.adv_unchecked();
-            set = matched2;
+            delimiter = matched2;
         }
-        Some(Token::new(
-            set,
+        Some(OutToken::new(
+            Delimiter(delimiter),
             Span::new(start, self.pos),
             Span::new(line, self.line)
         ))
@@ -210,14 +208,12 @@ impl<'a> Lexer<'a> {
     /// Checks for the start of an identifier
     #[inline]
     fn ident_start(c: char) -> bool {
-        match c {
+        matches! (
+            c,
             'a'..='z' |
             'A'..='Z' |
-            '_'       |
-            '~'       |
-            '#' => true,
-            _   => false,
-        }
+            '_'
+        )
     }
 
     /// Checks if the identifier can "continue" being an identifier at that character
@@ -225,15 +221,15 @@ impl<'a> Lexer<'a> {
     fn ident_continue(c: char) -> bool {
         // Some of these symbols may be removed later as the language progresses,
         // and cannot accommodate the symbols to be present in identifiers
-        match c {
+        matches! (
+            c,
             'a'..='z' |
             'A'..='Z' |
             '0'..='9' |
             '_'       |
             '~'       |
-            '#' => true,
-            _   => false,
-        }
+            '#'
+        )
     }
 
     /// Takes a number (integer) where `_` and `0..9` are valid symbols
@@ -268,28 +264,26 @@ impl<'a> Lexer<'a> {
         });
         // Check if the item was really closed
         let mut clone = self.it.clone();
-        let closed =
-            if clone.next() == Some(char_or_str) {
-                // We know that the character is a single symbol as it's only used for parsing
-                // strings and characters in this lexer
-                self.pos += 1;
-                self.it = clone;
-                true
-            } else {
-                false
-            };
-        closed
+        if clone.next() == Some(char_or_str) {
+            // We know that the character is a single symbol as it's only used for parsing
+            // strings and characters in this lexer
+            self.pos += 1;
+            self.it = clone;
+            true
+        } else {
+            false
+        }
     }
 
     /// Gets all the characters between `'` and `'`. This is meant to be only one symbol long,
     /// but that won't be checked here as we could have multiple characters between a
     /// Char type when using escape sequences, which are not parsed in this scope
     #[inline]
-    fn char(&mut self, set: CharSet) -> Option<Token> {
+    fn char(&mut self, set: CharSet) -> Option<OutToken> {
         let (line, start) = (self.line, self.pos);
         let closed = self.between('\'');
-        Some(Token::new(
-            Set::Char { closed, set },
+        Some(OutToken::new(
+            Char { closed, set },
             Span::new(start, self.pos),
             Span::new(line, self.line)
         ))
@@ -297,12 +291,12 @@ impl<'a> Lexer<'a> {
 
     /// Lexes an identifier and returns the respective token
     #[inline]
-    fn ident(&mut self) -> Option<Token> {
+    fn ident(&mut self) -> Option<OutToken> {
         let (line, start) = (self.line, self.pos);
         // allows identifiers such as `_919#`, `_~#.`, `ident`, `__~_.` etc
         self.take_while_unchecked(Self::ident_continue);
-        Some(Token::new(
-            Set::Identifier,
+        Some(OutToken::new(
+            Identifier,
             Span::new(start, self.pos),
             Span::new(line, self.line)
         ))
@@ -365,10 +359,17 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    #[inline]
+    fn take_suffix(&mut self, c: char) {
+        if Self::ident_start(c) {
+            self.take_while_unchecked(Self::ident_continue);
+        }
+    }
+
     // The main function of this lexer
     /// Generates the next token from it's [`Chars`] iterator and returns it as an [`Option`]
     #[inline]
-    pub fn next(&mut self) -> Option<Token> {
+    pub fn next(&mut self) -> Option<OutToken> {
         // These two values get used quite frequently (mostly in the macro now)
         let (line, start) = (self.line, self.pos);
         // A simple macro to reduce repetitive code
@@ -382,6 +383,17 @@ impl<'a> Lexer<'a> {
             }
         }
 
+        macro_rules! delimiter {
+            ($del: ident) => {{
+                self.adv_unchecked();
+                Some(Token::new(
+                    Delimiter($del),
+                    Span::new(start, self.pos),
+                    Span::new(line, self.line)
+                ))
+            }};
+        }
+
         // Used to peek, twice, where needed
         let mut clone = self.it.clone();
         // Lexes the next token based on the general number of the appearence of such symbols in code
@@ -391,17 +403,17 @@ impl<'a> Lexer<'a> {
             // reason
             c if char::is_whitespace(c) => {
                 self.take_while(char::is_whitespace);
-                tok!(Set::Whitespace)
+                tok!(Whitespace)
             },
 
             // These delimiters occur quite a lot in most code, so they are checked for first
-            ')' => self.single(Set::LeftParen),
-            '(' => self.single(Set::RightParen),
+            ')' => delimiter!(LeftParen),
+            '(' => delimiter!(RightParen),
 
-            '}' => self.single(Set::LeftBracket),
-            '{' => self.single(Set::RightBracket),
+            '}' => delimiter!(LeftBrace),
+            '{' => delimiter!(RightBrace),
 
-            ';' => self.single(Set::Semicolon),
+            ';' => delimiter!(Semicolon),
 
             // numbers and identifiers are also significant parts of code
             // Get numbers (hex, octal, binary, decimal or exponent)
@@ -450,12 +462,20 @@ impl<'a> Lexer<'a> {
                         }
 
                         // Just a normal `0` integer
-                        _ => return tok!(Set::Int { set, empty: false })
+                        _ => {
+                            // Take the suffix, if any
+                            let suffix_start = self.pos;
+                            self.take_suffix(self.peek());
+                            return tok!(Int { set, empty: false, suffix_start });
+                        }
                     };
 
+                    // An empty number was found: `0x` | `0b` | `0o`
                     if empty {
-                        // An empty number was found: `0x` | `0b` | `0o`
-                        return tok!(Set::Int { set, empty })
+                        // Take the suffix, if any
+                        let suffix_start = self.pos;
+                        self.take_suffix(self.peek());
+                        return tok!(Int { set, empty, suffix_start })
                     }
                 } else {
                     // Parse as a normal integer
@@ -488,11 +508,15 @@ impl<'a> Lexer<'a> {
                             }
                             _ => ()
                         }
-                        tok!(Set::Float {
+                        // Take the suffix, if any
+                        let suffix_start = self.pos;
+                        self.take_suffix(self.peek());
+                        tok!(Float {
                             set,
                             empty,
+                            suffix_start,
                             number   : Span::new(start, num_end),
-                            exponent : Span::new(exp_start, self.pos)
+                            exponent : Span::new(exp_start, suffix_start)
                         })
                     }
 
@@ -508,16 +532,25 @@ impl<'a> Lexer<'a> {
                         }
                         // Consume the exponent number
                         let empty = self.number();
-                        tok!(Set::Float {
+                        // Take the suffix, if any
+                        let suffix_start = self.pos;
+                        self.take_suffix(self.peek());
+                        tok!(Float {
                             set,
                             empty,
+                            suffix_start,
                             number   : Span::new(start, num_end),
-                            exponent : Span::new(exp_start, self.pos)
+                            exponent : Span::new(exp_start, suffix_start)
                         })
                     }
 
                     // A normal integer was found; There was no decimal place
-                    _ => tok!(Set::Int { set, empty: false })
+                    _ => {
+                        // Take the suffix, if any
+                        let suffix_start = self.pos;
+                        self.take_suffix(self.peek());
+                        tok!(Int { set, empty: false, suffix_start })
+                    }
                 }
             },
 
@@ -537,7 +570,7 @@ impl<'a> Lexer<'a> {
                         Ok(_) => (),
                         _ => err = RawStrErr::ExcessHashes,
                     };
-                    tok!(Set::String { set: StrSet::RawStr { hashes: hashes as u8, err } })
+                    tok!(String { set: StrSet::RawStr { hashes: hashes as u8, err } })
                 },
 
                 // Continue as a normal identifier
@@ -558,7 +591,7 @@ impl<'a> Lexer<'a> {
                     // Consume the `b` character
                     self.adv_unchecked();
                     let closed = self.between('\"');
-                    tok!(Set::String { set: StrSet::ByteStr { closed } })
+                    tok!(String { set: StrSet::ByteStr { closed } })
                 }
 
                 // Found a raw byte string
@@ -573,7 +606,7 @@ impl<'a> Lexer<'a> {
                         Ok(_) => (),
                         _ => err = RawStrErr::ExcessHashes,
                     };
-                    tok!(Set::String { set: StrSet::RawByteStr { hashes: hashes as u8, err } })
+                    tok!(String { set: StrSet::RawByteStr { hashes: hashes as u8, err } })
                 }
 
                 // Continue as a normal identifier
@@ -585,15 +618,15 @@ impl<'a> Lexer<'a> {
 
             // These are the significantly less used operators and delimiters
             // so they are lower than other delimiters / operators
-            ']' => self.single(Set::LeftBrace),
-            '[' => self.single(Set::RightBrace),
+            ']' => delimiter!(LeftBracket),
+            '[' => delimiter!(RightBracket),
 
-            '.' => self.double(Set::Dot, Set::Range, '.'), // . | ..
-            ':' => self.double(Set::Colon, Set::DoubleColon, ':'), // : | ::
-            '+' => self.double(Set::Plus, Set::PlusEqual, '='), // + | +=
-            '-' => self.double(Set::Minus, Set::MinusEqual, '='), // - | -=
-            '=' => self.double(Set::Assign, Set::Equal, '='), // = | ==
-            '!' => self.double(Set::Not, Set::NotEqual, '='), // ! |  !=
+            '.' => self.double(Dot, Range, '.'), // . | ..
+            ':' => self.double(Colon, DoubleColon, ':'), // : | ::
+            '+' => self.double(Plus, PlusEqual, '='), // + | +=
+            '-' => self.double(Minus, MinusEqual, '='), // - | -=
+            '=' => self.double(Assign, Equal, '='), // = | ==
+            '!' => self.double(Not, NotEqual, '='), // ! |  !=
 
             // Comments and slashes usually consist of around 1/10 of most "proper" code
             // This is a wild guess of course
@@ -617,7 +650,7 @@ impl<'a> Lexer<'a> {
                         self.take_while(|c| c != '\n');
                         // Consume newline, or do nothing if eof
                         self.adv();
-                        tok!(Set::SingleLineComment { set })
+                        tok!(SingleLineComment { set })
                     }
 
                     // Assuming that divide equal is more prominent than a multiline comment
@@ -625,7 +658,7 @@ impl<'a> Lexer<'a> {
                     // /=
                     '=' => {
                         self.adv_unchecked();
-                        tok!(Set::DivideEqual)
+                        tok!(Delimiter(DivideEqual))
                     },
 
                     // Multiline comment
@@ -663,11 +696,11 @@ impl<'a> Lexer<'a> {
                         // This could also have been put in the loop, but it makes little difference
                         // where exactly this is put
                         self.adv_unchecked();
-                        tok!(Set::MultiLineComment { set, closed: layer == 0 })
+                        tok!(MultiLineComment { set, closed: layer == 0, depth: layer })
                     }
 
                     // /
-                    _ => tok!(Set::Divide)
+                    _ => tok!(Delimiter(Divide)),
                 }
             }
 
@@ -677,7 +710,7 @@ impl<'a> Lexer<'a> {
             // This is a normal string
             '\"' => {
                 let closed = self.between('\"');
-                tok!(Set::String { set: StrSet::Normal { closed } })
+                tok!(String { set: StrSet::Normal { closed } })
             },
 
             // This is a normal character
@@ -689,59 +722,59 @@ impl<'a> Lexer<'a> {
             '&' =>
                 self.triple(
                     '&',
-                    Set::BitAnd,
-                    Set::And,
-                    Set::BitAndEqual
+                    BitAnd,
+                    And,
+                    BitAndEqual
                 ), // & | &= | &&
 
             '|' =>
                 self.triple(
                     '|',
-                    Set::BitOr,
-                    Set::Or,
-                    Set::BitOrEqual,
+                    BitOr,
+                    Or,
+                    BitOrEqual,
                 ), // | or |= or ||
 
             '<' =>
                 self.quadruple(
                     '<',
-                    Set::Lesser,
-                    Set::BitLeftShift,
-                    Set::LesserEqual,
-                    Set::BitLeftShiftEqual
+                    Lesser,
+                    BitLeftShift,
+                    LesserEqual,
+                    BitLeftShiftEqual
                 ), // < | <= | << | <<=
 
             '>' =>
                 self.quadruple(
                     '>',
-                    Set::Greater,
-                    Set::BitRightShift,
-                    Set::GreaterEqual,
-                    Set::BitRightShiftEqual
+                    Greater,
+                    BitRightShift,
+                    GreaterEqual,
+                    BitRightShiftEqual
                 ), // > | >= | >> | >>=
 
             '*' =>
                 self.quadruple(
                     '*',
-                    Set::Multiply,
-                    Set::Exponent,
-                    Set::MultiplyEqual,
-                    Set::ExponentEqual
+                    Multiply,
+                    Exponent,
+                    MultiplyEqual,
+                    ExponentEqual
                 ), // * | ** | *= | **=
 
             // These operators are hardly found in code, so they are very low in prominence
 
-            '%' => self.double(Set::Modulo, Set::ModuloEqual, '='), // % | %=
-            '^' => self.double(Set::BitXor, Set::BitXorEqual, '='), // ^ | ^=
+            '%' => self.double(Modulo, ModuloEqual, '='), // % | %=
+            '^' => self.double(BitXor, BitXorEqual, '='), // ^ | ^=
 
             // These are pretty obvious in what they do, don't you think?
-            '@' => self.single(Set::At),
-            '#' => self.single(Set::Hash),
-            '~' => self.single(Set::Tilde),
-            ',' => self.single(Set::Comma),
-            '$' => self.single(Set::Dollar),
-            '`' => self.single(Set::BackTick),
-            '?' => self.single(Set::Question),
+            '@' => delimiter!(At),
+            '#' => delimiter!(Hash),
+            '~' => delimiter!(Tilde),
+            ',' => delimiter!(Comma),
+            '$' => delimiter!(Dollar),
+            '`' => delimiter!(BackTick),
+            '?' => delimiter!(Question),
 
             // Well, one hardly finds invalid characters in code unless it was intentionally
             // put there so pretty obviously it is the lowest.
@@ -751,7 +784,7 @@ impl<'a> Lexer<'a> {
             // An invalid character was found. Will later be converted to an error
             _ => {
                 self.adv();
-                tok!(Set::Invalid)
+                tok!(Invalid)
             }
         }
     }

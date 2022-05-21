@@ -1,4 +1,8 @@
-use std::fmt::{ Debug, Display, Formatter };
+use std::fmt::{
+    Debug,
+    Display,
+    Formatter
+};
 use std::slice::Iter;
 
 /// A small implementation of an array (stack) based vector.
@@ -20,6 +24,8 @@ impl<T: Debug, const SIZE: usize> Display for SArr<T, SIZE> {
 }
 
 impl<T, const SIZE: usize> SArr<T, SIZE> {
+    /// Create a new instance of the array with a default value of `<T>`
+    /// Requires that `T` has the `Copy` and `Default` traits
     pub fn new() -> Self
         where T: Copy + Default {
         Self {
@@ -181,6 +187,14 @@ impl Span {
     /// Create a new span
     pub fn new(start: usize, end: usize) -> Self  {
         Self { start, end }
+    }
+
+    /// Create a new span from single value
+    pub fn single(val: usize) -> Self  {
+        Self {
+            start : val,
+            end   : val,
+        }
     }
 
     /// Convert the span to a [`Range<usize>`](core::ops::Range)

@@ -1,4 +1,11 @@
-use std::{ fmt, fmt::{ Display, Formatter } };
+use std::{
+    fmt,
+    fmt::{
+        Display,
+        Formatter,
+    },
+};
+
 use crate::matriad::util::Span;
 
 /// The comment type of a comment. Either a doc comment or a normal one.
@@ -89,53 +96,8 @@ pub enum StrSet {
     },
 }
 
-/// The token type, that the lexer returns
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Set {
-    /// \t \n \r <space> and other special unicode spaces.
-    /// Look at the [`is_whitespace`](crate::matriad::lexer::Lexer::is_whitespace) function to see
-    /// what whitespace symbols are considered valid whitespace.
-    Whitespace,
-    /// Any valid identifier, this is currently open to more symbols than other languages:
-    /// `x`, `very~nice`, `token#9`, `no_no_no`, `____so_hard_to#find~me`
-    /// The `#` and `~` symbols may be removed from identifiers when the language progresses
-    /// and cannot accommodate such symbols as valid identifiers
-    Identifier,
-
-    /// A float, one that must have no trailing, or preceding dots. Exponents can be used
-    ///
-    /// Valid: `1.0`, `0.1`, `10e10`, `1.299e-99` etc.
-    ///
-    /// Invalid: "`1.`" -> ("`1`" & "`.`"), "`.1`" -> ("`.`" & "`1`")
-    ///
-    /// The `number` property holds the range of characters where the actual number is present
-    /// It holds values like: `1.422` `0.01` etc.
-    ///
-    /// The `exponent` property holds the range of characters where the exponent factor is present
-    /// It holds values like: `+20`, `-19`, `4` etc.
-    Float { set: NumberSet, empty: bool, number: Span, exponent: Span },
-    /// An integer, this can be of any type, hex, octal, binary, or a normal integer.
-    Int   { set: NumberSet, empty: bool },
-
-    /// Any of the string types defined in [`StrSet`]
-    String {               set: StrSet },
-    /// Any of the character types defined in [`CharSet`]
-    Char   { closed: bool, set: CharSet },
-
-    // comments
-    /// A multiline comment that supports nested comments
-    /// Normal comments: `/* comment text\n comment text... */` & `/**/`
-    ///
-    /// Nesting: `/* /* A valid & nested comment */ */`,
-    /// `/* /* An invalid, nested comment that has not been closed */`
-    ///
-    /// Doc comments: `/** A multiline\n doc comment */`
-    MultiLineComment  { set: CommentSet, closed: bool  },
-    /// Single line comments
-    ///
-    /// Normal comments: `// <comment text>\n`
-    SingleLineComment { set: CommentSet },
-
+pub enum Delimiters {
     // operators
     /// +
     Plus,
@@ -258,15 +220,132 @@ pub enum Set {
     LeftBrace,
     /// A closing flower bracket or brace: `}`
     RightBrace,
-
-    /// An invalid character has been lexed by the token.
-    /// This will produce an error in future stages of compilation
-    Invalid,
 }
 
-impl Display for Set {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+pub mod lexer {
+    use super::*;
+
+    /// The token type, that the lexer returns
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum Set {
+        /// \t \n \r <space> and other special unicode spaces.
+        /// Look at the [`is_whitespace`](crate::matriad::lexer::Lexer::is_whitespace) function to see
+        /// what whitespace symbols are considered valid whitespace.
+        Whitespace,
+        /// Any valid identifier, this is currently open to more symbols than other languages:
+        /// `x`, `very~nice`, `token#9`, `no_no_no`, `____so_hard_to#find~me`
+        /// The `#` and `~` symbols may be removed from identifiers when the language progresses
+        /// and cannot accommodate such symbols as valid identifiers
+        Identifier,
+
+        /// A float, one that must have no trailing, or preceding dots. Exponents can be used
+        ///
+        /// Valid: `1.0`, `0.1`, `10e10`, `1.299e-99` etc.
+        ///
+        /// Invalid: "`1.`" -> ("`1`" & "`.`"), "`.1`" -> ("`.`" & "`1`")
+        ///
+        /// The `number` property holds the range of characters where the actual number is present
+        /// It holds values like: `1.422`, `0.01` etc.
+        ///
+        /// The `exponent` property holds the range of characters where the exponent factor is present
+        /// It holds values like: `+20`, `-19`, `4` etc.
+        Float {
+            set          : NumberSet,
+            empty        : bool,
+            number       : Span,
+            exponent     : Span,
+            suffix_start : usize,
+        },
+        /// An integer, this can be of any type, hex, octal, binary, or a normal integer.
+        Int {
+            set          : NumberSet,
+            empty        : bool,
+            suffix_start : usize,
+        },
+
+        /// Any of the string types defined in [`StrSet`]
+        String { set: StrSet },
+        /// Any of the character types defined in [`CharSet`]
+        Char { closed: bool, set: CharSet },
+
+        // comments
+        /// A multiline comment that supports nested comments
+        /// Normal comments: `/* comment text\n comment text... */` & `/**/`
+        ///
+        /// Nesting: `/* /* A valid & nested comment */ */`,
+        /// `/* /* An invalid, nested comment that has not been closed */`
+        ///
+        /// Doc comments: `/** A multiline\n doc comment */`
+        MultiLineComment { set: CommentSet, closed: bool, depth: usize },
+        /// Single line comments
+        ///
+        /// Normal comments: `// <comment text>\n`
+        SingleLineComment { set: CommentSet },
+
+        /// Delimiters and operators
+        Delimiter (Delimiters),
+
+        /// An invalid character has been lexed by the token.
+        /// This will produce an error in future stages of compilation
+        Invalid,
+    }
+
+    impl Display for Set {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            write!(f, "{:?}", self)
+        }
+    }
+}
+
+/// This is for the lexer error validator
+pub mod lexthrow {
+    use super::*;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum StringValue {
+        String(String),
+        Span(Span),
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum StringType {
+        Normal,
+        Byte,
+        // Raw type is not required here since there's nothing different about it when compared to
+        // the normal string, for the parser
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum NumberType {
+        Float,
+        UnsignedInteger,
+        Integer,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum NumberPrecision {
+        Small  = 8,
+        Medium = 16,
+        Normal = 32,
+        Large  = 64,
+        Full   = 128,
+        Max,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+    pub enum Set {
+        String    (StringValue, StringType),
+        Char      (StringValue, StringType),
+        Number    (NumberType, NumberPrecision, NumberSet),
+        Delimiter (Delimiters),
+        Identifier,
+        Invalid,
+    }
+
+    impl Display for Set {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            write!(f, "{:?}", self)
+        }
     }
 }
 
@@ -275,22 +354,25 @@ impl Display for Set {
 /// Stores the type and location data of each token so that it can later by analyzed by the parser
 /// or any other later step used in compiling the code
 #[derive(Debug, Clone, PartialEq)]
-pub struct Token{
+pub struct Token<S> {
     /// The token type, here called a set because parts of my keyboard is broken and it's harder to
     /// type in "token_type" than "set"
-    pub set   : Set,
+    pub set: S,
     /// The position indexes referenced by the token
-    pub pos   : Span,
+    pub pos: Span,
     /// All the lines which this token spans
-    pub lines : Span,
+    pub lines: Span,
 }
 
-impl Token {
-    pub fn new(set: Set, pos: Span, lines: Span) -> Token {
-        Token { set, pos, lines }
+impl<S> Token<S> {
+    /// Create a new token
+    pub fn new(set: S, pos: Span, lines: Span) -> Self {
+        Self { set, pos, lines }
     }
 
-    pub fn show(&self, src: &str) -> String {
+    /// Format the token into something *more* readable than a debug print
+    pub fn show(&self, src: &str) -> String
+        where S: Display {
         format!(
             "Token(Type = {}, Value = {:?}, Pos = {}, Line = {})",
             self.set, self.pos.to_src(src), self.pos, self.lines,
@@ -298,13 +380,13 @@ impl Token {
     }
 }
 
-impl Default for Token {
+impl<S: Default> Default for Token<S> {
     fn default() -> Self {
-        Token::new(Set::Invalid, Span::new(0, 0), Span::new(0, 0))
+        Token::new(S::default(), Span::new(0, 0), Span::new(0, 0))
     }
 }
 
-impl Display for Token {
+impl<S: Display> Display for Token<S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
