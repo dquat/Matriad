@@ -8,7 +8,10 @@
 
 // imports
 use std::{
-    borrow::Cow,
+    borrow::{
+        Cow,
+        Borrow,
+    },
     fmt::{
         Display,
         Formatter,
@@ -19,18 +22,27 @@ use std::{
     },
 };
 
-use crossterm::style::Stylize;
-use unicode_width::{
-    UnicodeWidthChar,
-    UnicodeWidthStr,
+use crossterm::style::{
+    Attribute,
+    Stylize,
+    Color,
 };
+
+use unicode_width::UnicodeWidthStr;
 
 use crate::matriad::{
     util::Span,
     config::*,
 };
 
-use crossterm::style::Color;
+fn get_color(msg_type: MsgType) -> Color {
+    match msg_type {
+        MsgType::Information => INFO_COLOR,
+        MsgType::Warning     => WARN_COLOR,
+        MsgType::WeakWarning => WEAK_WARN_COLOR,
+        MsgType::Error       => ERROR_COLOR,
+    }
+}
 
 /// A structure to hold pointer data, including where it should be located and
 /// what kind of pointer character should be used
@@ -94,7 +106,9 @@ impl<'a> Pointer<'a> {
 #[derive(Debug, PartialEq)]
 pub struct Visualizer<'a> {
     /// The source code
-    pub src      : Cow<'a, str>,
+    pub mut_src  : Cow<'a, str>,
+    /// The source code
+    pub src      : &'a str,
     /// The lines to show
     pub lines    : Span,
     /// The start location of the message (used to find out where the pointers start)
@@ -113,7 +127,7 @@ impl<'a> Clone for Visualizer<'a> {
     fn clone(&self) -> Self {
         Self {
             // Only clone some parts, better performance... maybe?
-            src      : self.src     .clone(),
+            mut_src  : self.mut_src .clone(),
             exclude  : self.exclude .clone(),
             pointers : self.pointers.clone(),
             ..*self
@@ -139,15 +153,16 @@ impl<'a> Visualizer<'a> {
                 .take(lines.start)
                 .collect::<String>()
                 .chars()
-                .count();
+                .fold(0, |acc, c| acc + c.len_utf8());
         Self {
-            src      : Cow::Borrowed(src),
+            mut_src  : Cow::Borrowed(src),
             exclude  : Vec::new(),
             pointers : Vec::new(),
             msg_type : None,
             lines,
             start,
             label,
+            src,
         }
     }
 
@@ -166,15 +181,16 @@ impl<'a> Visualizer<'a> {
                 .take(lines.start)
                 .collect::<String>()
                 .chars()
-                .count();
+                .fold(0, |acc, c| acc + c.len_utf8());
         Self {
-            src      : Cow::Borrowed(src),
+            mut_src  : Cow::Borrowed(src),
             exclude  : Vec::new(),
             pointers : Vec::new(),
             msg_type : None,
             lines,
             start,
             label,
+            src,
         }
     }
 
@@ -187,33 +203,30 @@ impl<'a> Visualizer<'a> {
         self
     }
 
-    /// Set the start location of the visualizer
-    #[inline]
-    pub fn set_start(&mut self, start: usize) -> &mut Self {
-        self.start = start;
-        self
-    }
-
     /// Checks if the pointer starts on a specific line
     #[inline]
-    fn starts_on_line(pointer: &Pointer, start: usize, end: usize) -> bool {
+    fn starts_on_line(&self, pointer: &Pointer, start: usize, end: usize) -> bool {
+        // let rng = Span::new(0, pointer.span.start).len_str(self.src.borrow());
         pointer.span.start >= start && pointer.span.start < end
     }
 
     /// Checks if a pointer covers all of the specific line
     #[inline]
-    fn is_on_line(pointer: &Pointer, start: usize, end: usize) -> bool {
+    fn is_on_line(&self, pointer: &Pointer, start: usize, end: usize) -> bool {
+        // let rng_s = Span::new(0, pointer.span.start).len_str(self.src.borrow());
+        // let rng_e = Span::new(0, pointer.span.end).len_str(self.src.borrow());
         pointer.span.start <= start && pointer.span.end >= end
     }
 
     /// Checks if a pointer ends on the specific line
     #[inline]
-    fn end_on_line(pointer: &Pointer, start: usize, end: usize) -> bool {
+    fn end_on_line(&self, pointer: &Pointer, start: usize, end: usize) -> bool {
+        // let rng = Span::new(0, pointer.span.end).len_str(self.src.borrow());
         pointer.span.end >= start && pointer.span.end < end
     }
 
     #[inline]
-    fn point(pointers: &mut [&Pointer], max_len: usize, pos: usize) {
+    fn point(val: &str, pointers: &mut [&Pointer], max_len: usize, pos: usize) {
         for i in 0..pointers.len() {
             // The padding to be applied to the left
             print!("{}", &" ".repeat(max_len));
@@ -223,20 +236,21 @@ impl<'a> Visualizer<'a> {
             // This stores the previous start location of the previous span
             let mut prev = 0;
             for i in 0..pointers.len() {
+                let span_start = Span::new(0, pointers[i].span.start - pos).len_str(val);
                 // The start location of this span
-                let start = pointers[i].span.start - pos + 1;
+                let start = span_start + 1;
                 // We have encountered the same position
                 if start == prev {
                     // We're at the end and we have encountered the same position as before
                     // Print this message too
                     if i + 1 == pointers.len() {
-                        print!("{} {}", ">".with(PIPE_COLOR), pointers[i].message.unwrap());
+                        print!("{} {}", ">".with(pointers[i].colors.0), pointers[i].message.unwrap());
                     }
                     // Skip the iteration, since we don't need to add all the other characters
                     continue;
                 }
                 // Add required spaces
-                print!("{}", &" ".repeat(pointers[i].span.start - pos - prev));
+                print!("{}", &" ".repeat(span_start - prev));
                 // If we're at the end, print the message
                 if i + 1 == pointers.len() {
                     print!("{}",
@@ -251,7 +265,7 @@ impl<'a> Visualizer<'a> {
                     );
                 }
                 // If not, we print an extender (`|`)
-                else { print!("{}", "|".with(PIPE_COLOR)); }
+                else { print!("{}", "|".with(pointers[i].colors.0)); }
                 // Store the previously accessed location
                 prev = start;
             }
@@ -260,10 +274,10 @@ impl<'a> Visualizer<'a> {
         }
     }
 
-    pub fn show(&mut self) {
+    pub fn _show(&mut self) {
         // The lines that incorporate this visualizer
         // The wrap function is expected to be called first, before this
-        let lines = self.src.lines();
+        let lines = self.mut_src.lines();
         // The number of excluded lines we have currently encountered
         let mut excluded = 0usize;
         // The maximum line number length that this visualizer has, as a string
@@ -271,9 +285,9 @@ impl<'a> Visualizer<'a> {
         let mut pos = self.start + self.lines.start;
         // Loop through lines
         for (line, val) in lines.enumerate() {
-            // TODO: use unicode width here? Probably. Will introduce a lot of work I assume
-            let val_len = val.chars().count();
-            let mut end_pos = pos + val_len;
+            // Compute the unicode width of the current line
+            let val_len = UnicodeWidthStr::width(val);
+            let mut end_pos = pos + val.chars().fold(0, |acc, c| acc + c.len_utf8());
             let is_excluded = self.exclude.contains(&line);
             let is_empty = val.is_empty();
             // Show that the text in that line is empty
@@ -312,12 +326,13 @@ impl<'a> Visualizer<'a> {
                 // This stores the calculated length of pointers to display on this current line,
                 // for this specific pointer
                 let mut calculated_length = 0;
-                if Self::starts_on_line(pointer, pos, end_pos) {
+                if self.starts_on_line(pointer, pos, end_pos) {
                     // Get the starting location of the pointer
                     // This is calculated relative to the current line being considered
-                    let start = pointer.span.start - pos;
-                    // Get the length of the pointer
-                    let mut len = pointer.span.len();
+                    let start = Span::new(0, pointer.span.start - pos).len_str(&val);
+
+                    // Compute the end location of the pointer (below)
+                    let mut end = pointer.span.end;
                     // If the starting location is more than the previous location, there are no
                     // overlaps, so print spaces based on the distance covered previously
                     if start >= prev {
@@ -328,21 +343,25 @@ impl<'a> Visualizer<'a> {
                     // If the length is more than the difference of the previous location and the
                     // previous location is greater than the start, i.e. the start intersects the end
                     // of the previous pointer, reduce the length by the difference
-                    else if len > prev - start {
-                        len -= prev - start;
+                    else if end > prev - start {
+                        end -= prev - (pointer.span.start - pos);
                     }
                     // If the pointer completely gets covered by the previous pointer, then don't print
                     // it by setting the length to 0
                     else {
-                        len = 0;
+                        end = prev - (pointer.span.start - pos);
                     }
+                    // Compute the length of the pointer
+                    let len =
+                        if pointer.span.start <= end { Span::new(pointer.span.start, end).len_str(&self.src) }
+                        else { 0 };
                     calculated_length +=
                         if len + pointer_len > val_len {
                             val_len - pointer_len
                         } else {
                             len
                         };
-                } else if Self::is_on_line(pointer, pos, end_pos) {
+                } else if self.is_on_line(pointer, pos, end_pos) {
                     calculated_length +=
                         // If we have already completely covered the area, then don't
                         // add any more pointers
@@ -354,8 +373,8 @@ impl<'a> Visualizer<'a> {
                         else {
                             val_len - prev
                         };
-                } else if Self::end_on_line(pointer, pos, end_pos) {
-                    let diff = pointer.span.end - pos;
+                } else if self.end_on_line(pointer, pos, end_pos) {
+                    let diff = Span::new(0, pointer.span.end - pos).len_str(&val);
                     calculated_length +=
                         // If the difference is greater than the previous. This needs
                         // to be checked since we don't order the pointers based on their
@@ -375,7 +394,7 @@ impl<'a> Visualizer<'a> {
                 }
                 if let Some((loc, str)) = pointer.insert {
                     let string = format!("{}", str.with(POINTER_INSERT_COLOR));
-                    Self::insert(&mut val, loc - pos, &string);
+                    self.insert(&mut val, loc - pos, &string);
                     pointer_string +=
                         &pointer
                             .pointer
@@ -404,12 +423,12 @@ impl<'a> Visualizer<'a> {
                 self.pointers
                     .iter()
                     .filter(|p|
-                        Self::starts_on_line(p, pos, end_pos) &&
+                        self.starts_on_line(p, pos, end_pos) &&
                             p.message.is_some()
                     );
             // Generate a slice from the above
             let mut slice = Vec::from_iter(iter);
-            let mut slice = slice.as_mut_slice();
+            let slice = slice.as_mut_slice();
             print!(
                 "{}{} {} {}\n",
                 " ".repeat(max_len - num.len()),
@@ -437,6 +456,7 @@ impl<'a> Visualizer<'a> {
             stdout().flush().ok();
             // Create helper messages from the above slices
             Self::point(
+                val.borrow(),
                 slice,
                 max_len,
                 // Account for the extra newline on wrapped lines
@@ -459,13 +479,13 @@ impl<'a> Visualizer<'a> {
         // holds the newly generated lines
         let mut new_lines =
             Vec::with_capacity(
-                self.src
+                self.mut_src
                     .matches('\n')
                     .count()
             );
         // The lines that incorporate this visualizer
         let lines =
-            self.src
+            self.mut_src
                 .lines()
                 // Skip the lines from the start
                 .skip(self.lines.start)
@@ -523,9 +543,9 @@ impl<'a> Visualizer<'a> {
             let mut src = new_lines.join("\n");
             src.pop();
             // assign the values that were computed
-            self.src = Cow::Owned(src);
+            self.mut_src = Cow::Owned(src);
         } else {
-            self.src =
+            self.mut_src =
                 Cow::Owned(
                     lines
                         .collect::<Vec<&str>>()
@@ -535,14 +555,30 @@ impl<'a> Visualizer<'a> {
         self
     }
 
+    pub fn show(&mut self) {
+        if !self.label.is_empty() {
+            println!("{}", self.label.with(LABEL_COLOR).attribute(Attribute::Bold));
+        }
+        self._show();
+    }
+
     /// Insert a value into a [`Cow`] string
-    fn insert(value: &mut Cow<'_, str>, location: usize, str: &str) {
+    fn insert(&self, value: &mut Cow<'_, str>, location: usize, str: &str) {
         match value {
-            Cow::Owned(ref mut string) => string.insert_str(location, str),
+            // Yeah these two are the same, but I don't care
+            Cow::Owned(string) => {
+                *value = Cow::Owned(
+                    (&string[0..location]).with(get_color(self.msg_type.unwrap_or(MsgType::Error))).to_string() +
+                        str +
+                        (&string[location..]).with(get_color(self.msg_type.unwrap_or(MsgType::Error))).to_string().as_str()
+                )
+            },
             Cow::Borrowed(string) => {
-                let mut owned = string.to_owned();
-                owned.insert_str(location, str);
-                *value = Cow::Owned(owned);
+                *value = Cow::Owned(
+                    (&string[0..location]).with(get_color(self.msg_type.unwrap_or(MsgType::Error))).to_string() +
+                        str +
+                        (&string[location..]).with(get_color(self.msg_type.unwrap_or(MsgType::Error))).to_string().as_str()
+                );
             },
         };
     }
@@ -587,8 +623,10 @@ pub struct Msg<'a, S0: Clone + Display, S1: Clone + Display> {
     pub file         : S1,
     /// The source code that this message points to
     pub src          : &'a str,
-    /// The range of the message
-    pub span         : Span,
+    /// The line range of the message
+    pub lines        : Span,
+    /// The position range of the message
+    pub pos          : Span,
     /// The type of message (see [`MsgType`] for all available types)
     pub msg_type     : MsgType,
     /// The code of the message (can be empty)
@@ -617,6 +655,8 @@ impl<'a, S0: Clone + Display, S1: Clone + Display> Msg<'a, S0, S1> {
         src        : &'a str,
         line_start : usize,
         line_end   : usize,
+        start      : usize,
+        end        : usize,
         msg_type   : MsgType,
     ) -> Self {
         Self {
@@ -624,7 +664,8 @@ impl<'a, S0: Clone + Display, S1: Clone + Display> Msg<'a, S0, S1> {
             message,
             file,
             src,
-            span         : Span::new(line_start, line_end),
+            lines        : Span::new(line_start, line_end),
+            pos          : Span::new(start, end),
             visualizers  : Vec::new(),
             msg_code     : None,
         }
@@ -635,14 +676,16 @@ impl<'a, S0: Clone + Display, S1: Clone + Display> Msg<'a, S0, S1> {
         message  : S0,
         file     : S1,
         src      : &'a str,
-        span     : Span,
+        lines    : Span,
+        pos      : Span,
         msg_type : MsgType,
     ) -> Self {
         Self {
             msg_type,
             message,
             file,
-            span,
+            lines,
+            pos,
             src,
             visualizers  : Vec::new(),
             msg_code     : None,
@@ -655,9 +698,126 @@ impl<'a, S0: Clone + Display, S1: Clone + Display> Msg<'a, S0, S1> {
         self
     }
 
+    /// Add a visualizer to the visualizer array, and return the message
+    pub fn add_vis_(mut self) -> Self {
+        let mut vis = Visualizer::new_span(self.src, self.lines, "");
+        match crossterm::terminal::size() {
+            Ok((width, _)) => {
+                vis.wrap(width as usize, 0);
+            },
+            _ => {
+                vis.wrap(0, 0);
+            }
+        };
+        vis.msg_type = Some(self.msg_type);
+        self.visualizers.push(vis);
+        self
+    }
+
+    /// Set the code of this message
+    pub fn set_code_(mut self, code: &'a str) -> Self {
+        self.msg_code = Some(code);
+        self
+    }
+
+    /// Add a pointer to the current visualizer
+    pub fn add_ptr(mut self, pointer: char, span: Span) -> Self {
+        match self.visualizers.last_mut() {
+            Some(vis) => {
+                vis.add_ptr(Pointer::new(pointer, span));
+                self
+            },
+            None =>
+                self
+                    .add_vis_()
+                    .add_ptr(pointer, span),
+        }
+    }
+
+    /// Set the message of the current pointer in the current visualizer
+    /// Order matters since the visualizer sorts the pointers based on it's start locations
+    pub fn set_ptr_msg(mut self, message: &'a str, color: Color) -> Self {
+        match self.visualizers.last_mut() {
+            Some(vis) => {
+                match vis.pointers.last_mut() {
+                    Some(ptr) => {
+                        ptr.set_msg(message, color);
+                    },
+                    None => (),
+                };
+                self
+            },
+            None => self,
+        }
+    }
+
+    /// Set the insert value of the current pointer in the current visualizer
+    /// Order matters since the visualizer sorts the pointers based on it's start locations
+    pub fn set_ptr_insert(mut self, loc: usize, insert: &'a str) -> Self {
+        match self.visualizers.last_mut() {
+            Some(vis) => {
+                match vis.pointers.last_mut() {
+                    Some(ptr) => {
+                        ptr.set_insert(loc, insert);
+                    },
+                    None => (),
+                };
+                self
+            },
+            None => self,
+        }
+    }
+
+    /// Set the color of the current pointer in the current visualizer
+    /// Order matters since the visualizer sorts the pointers based on it's start locations
+    pub fn set_ptr_color(mut self, color: Color) -> Self {
+        match self.visualizers.last_mut() {
+            Some(vis) => {
+                match vis.pointers.last_mut() {
+                    Some(ptr) => {
+                        ptr.set_pointer_color(color);
+                    },
+                    None => (),
+                };
+                self
+            },
+            None => self,
+        }
+    }
+
+    /// Set the label of the current visualizer
+    pub fn set_label(mut self, label: &'a str) -> Self {
+        match self.visualizers.last_mut() {
+            Some(vis) => {
+                vis.label = label;
+                self
+            },
+            None =>
+                self
+                    .add_vis_()
+                    .set_label(label),
+        }
+    }
+
+    /// Create a new visualizer from the given lines
+    pub fn add_vis_lines(mut self, lines: Span) -> Self {
+        let mut vis = Visualizer::new_span(self.src, lines, "");
+        match crossterm::terminal::size() {
+            Ok((width, _)) => {
+                vis.wrap(width as usize, 0);
+            },
+            _ => {
+                vis.wrap(0, 0);
+            }
+        };
+        vis.msg_type = Some(self.msg_type);
+        self.visualizers.push(vis);
+        self
+    }
+
     /// Add a visualizer to the visualizer array
     pub fn add_vis(&mut self) -> &mut Visualizer<'a> {
-        let mut vis = Visualizer::new_span(self.src, self.span, "");
+        let mut vis = Visualizer::new_span(self.src, self.lines, "");
         match crossterm::terminal::size() {
             Ok((width, _)) => {
                 vis.wrap(width as usize, 0);
@@ -674,25 +834,60 @@ impl<'a, S0: Clone + Display, S1: Clone + Display> Msg<'a, S0, S1> {
     /// Generates the messages and shows it
     pub fn show(&mut self) {
         // Select color
-        let color = match self.msg_type {
-            MsgType::Information => INFO_COLOR,
-            MsgType::Warning     => WARN_COLOR,
-            MsgType::WeakWarning => WEAK_WARN_COLOR,
-            MsgType::Error       => ERROR_COLOR,
-        };
+        let color = get_color(self.msg_type);
 
         let code =
             match self.msg_code {
-                Some(code) => Cow::Owned(format!(" [{}]", code.with(color))),
+                Some(code) =>
+                    Cow::Owned(
+                        format!(
+                            " [{}]",
+                            code
+                                .with(color)
+                                .attribute(Attribute::Bold)
+                        )
+                    ),
                 _ => Cow::Borrowed(""),
             };
 
         println!(
-            "{}{}: {}\n  --> {}",
-            self.msg_type.to_string().with(color),
+            "{}{}: {}\n  --> {}: {}:{} -> {}:{}",
+            self
+                .msg_type
+                .to_string()
+                .with(color)
+                .attribute(Attribute::Bold),
             code,
-            self.message.to_string().with(color),
-            self.file,
+            self
+                .message
+                .to_string()
+                .with(color),
+            self
+                .file
+                .to_string()
+                .with(FILE_COLOR)
+                .attribute(Attribute::Underlined),
+
+            // Format: {start position}:{start line} -> {end position}:{end line}
+            self
+                .pos
+                .start
+                .to_string()
+                .with(NUMBER_COLOR),
+
+            (self.lines.start + 1)
+                .to_string()
+                .with(NUMBER_COLOR),
+
+            self
+                .pos
+                .end
+                .to_string()
+                .with(NUMBER_COLOR),
+
+            (self.lines.end + 1)
+                .to_string()
+                .with(NUMBER_COLOR),
         );
 
         for vis in self.visualizers.iter_mut() {

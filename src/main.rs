@@ -9,18 +9,17 @@ extern crate unicode_width;
 mod matriad;
 
 // Just for tests
+#[cfg(test)]
 mod test;
 
+use std::path::Path;
 // imports
 use std::time::{
     Duration,
     Instant,
 };
-use crossterm::style::{Color, Stylize};
 use crate::matriad::lexer::Lexer;
 use crate::matriad::lexthrow::LexThrow;
-use crate::matriad::message::*;
-use crate::matriad::util::*;
 
 // Test code stuff
 fn main() {
@@ -29,17 +28,88 @@ fn main() {
     // end up looking like
     // lex_speed();
 
-    // Stuff for the message class I'm playing with
+    // Lex a given program!
+    let mut args = std::env::args();
+    let program = args.next().unwrap_or(String::from(" matriad"));
+    let last_idx = match program.rfind("/") {
+        Some(v) => v,
+        None => match program.rfind("\\") {
+            Some(v) => v,
+            None => 0,
+        },
+    };
+    let program = &program[last_idx + 1..];
+    if let Some(mut file) = args.next() {
+        if !file.ends_with(".mrd") {
+            file.push_str(".mrd");
+        }
+        println!("Trying to read file `{}`.", file);
+        let path = Path::new(&file);
+        match std::fs::read_to_string(path) {
+            Ok(src) => {
+                println!("File read successfully!");
+                println!("Trying to lex contents of file...");
+                let src =
+                    src
+                        // Remove carriage returns since the message class uses newlines to display
+                        // messages, and carriage returns throw it's locations all over the place
+                        .replace('\r', "")
+                        // Tabs will be replaced with 4 spaces just for convenience
+                        // Mainly so that I don't have to do extra work in generating a message
+                        .replace('\t', "    ");
+                let elapsed = Instant::now();
+                let mut lexer = Lexer::new(&src);
+                let mut next = || lexer.next();
+                let mut lexerror = LexThrow::new(&mut next, &src);
+                let mut error_count = 0;
+                loop {
+                    match lexerror.next() {
+                        // A value was generated, print it out
+                        Ok(val) => {
+                            println!("{val:#?}")
+                        },
+                        // We found an EOF
+                        Err(crate::matriad::lexthrow::LexError::EOF) => break,
+                        // An error was generated, do nothing
+                        _ => error_count += 1,
+                    };
+                }
+                let elapsed = elapsed.elapsed();
+                if error_count > 0 {
+                    println!("Encountered {error_count} error(s).");
+                }
+                println!("Finished lexing and printing in {elapsed:?}.");
+            },
 
-    // Try it out! you'll get a beautiful error!
-    // Please don't look at how I created it. You might just loose your eyes!
-    let src = "Hello.\n Welcome to this programmmmm /*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*";
-    let mut lexer = Lexer::new(src);
-    let mut next = || lexer.next();
-    let mut lexerror = LexThrow::new(&mut next, src);
-    for _ in 0..30 {
-        lexerror.next();
+            Err(error) => println!("Failed to read file `{}` because of the error: {}", file, error.kind()),
+        };
+    } else {
+        println!("Please enter a file name to lex.");
+        println!("Run `{program} <file> | <file>.mrd | </path/file> | </path/file>.mrd` to lex a specific file.");
     }
+
+    // // Try it out! you'll get a beautiful error!
+    // // Please don't look at how I created it. You might just loose your eyes!
+    // // let src = "Hello👪.\n Welcome to this programm👪mmm /* Would 👪you /* like */-\nto see an 👪error?\n /* Suore t👪hing!-";
+    // // let src = "bb👪\naa \"wh👪 wah!\n\t ayy\\ y👪\nhelo";
+    // let src = "\"bee \n\\\n         lleee\"";
+    // // Tabs will be replaced with 4 spaces just for convenience
+    // // Mainly so that I don't have to do extra work in generating a message
+    // let src = src.replace('\t', "    ");
+    // let mut lexer = Lexer::new(&src);
+    // let mut next = || lexer.next();
+    // let mut lexerror = LexThrow::new(&mut next, &src);
+    // loop {
+    //     match lexerror.next() {
+    //         // A value was generated
+    //         Ok(val) => {
+    //             println!("{val:#?}")
+    //         },
+    //         // we found an EOF
+    //         Err(crate::matriad::lexthrow::LexError::EOF) => break,
+    //         _ => ()
+    //     };
+    // }
 }
 
 fn bench(mut func: impl FnMut(), num: u32, samples: u32) -> Duration {

@@ -1,9 +1,13 @@
-use std::fmt::{
-    Debug,
-    Display,
-    Formatter
+use std::{
+    fmt::{
+        Debug,
+        Display,
+        Formatter,
+    },
+    slice::Iter,
 };
-use std::slice::Iter;
+
+use unicode_width::UnicodeWidthStr;
 
 /// A small implementation of an array (stack) based vector.
 /// It is about 6x faster than Vec, when the size is known.
@@ -222,6 +226,13 @@ impl Span {
         }
     }
 
+    /// Find out the distance covered by the span, i.e. length of the span, in unicode width
+    pub fn len_str(&self, string: &str) -> usize {
+        let string = &string[self.start..self.end];
+        let lc = string.lines().count();
+        UnicodeWidthStr::width(string) + if lc > 0 { lc - 1 } else { lc }
+    }
+
     /// Swap the values of the span
     #[inline]
     pub fn swap(&mut self) {
@@ -230,7 +241,7 @@ impl Span {
 
     /// Show where the span lies, given a source string
     #[inline]
-    pub fn to_src<'a>(&self, src: &'a str) -> &'a str {
+    pub fn as_src<'a>(&self, src: &'a str) -> &'a str {
         &src[self.range()]
     }
 }

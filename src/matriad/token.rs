@@ -30,6 +30,18 @@ pub enum NumberSet {
     Normal,
 }
 
+impl Display for NumberSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            Self::Hex    => "Hexadecimal",
+            Self::Binary => "Binary",
+            Self::Normal => "Normal",
+            Self::Octal  => "Octal",
+        };
+        write!(f, "{str}")
+    }
+}
+
 /// An enum to define the type of character the lexer has lexed
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CharSet {
@@ -45,7 +57,9 @@ pub enum RawStrErr {
     /// Unexpected character between `r#` and `"`, i.e. something like `r#["Oh no!"#`
     UnexpectedChar {
         /// The character that was unexpected
-        unexpected : char
+        unexpected : char,
+        /// The place were this character was found
+        location   : usize,
     },
     /// Less hashes on the right than what was given on the left: `r###"This is an error?"##`
     LacksHashes {
@@ -229,9 +243,8 @@ pub mod lexer {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum Set {
         /// \t \n \r <space> and other special unicode spaces.
-        /// Look at the [`is_whitespace`](crate::matriad::lexer::Lexer::is_whitespace) function to see
-        /// what whitespace symbols are considered valid whitespace.
         Whitespace,
+
         /// Any valid identifier, this is currently open to more symbols than other languages:
         /// `x`, `very~nice`, `token#9`, `no_no_no`, `____so_hard_to#find~me`
         /// The `#` and `~` symbols may be removed from identifiers when the language progresses
@@ -250,21 +263,32 @@ pub mod lexer {
         /// The `exponent` property holds the range of characters where the exponent factor is present
         /// It holds values like: `+20`, `-19`, `4` etc.
         Float {
+            /// The type of float
             set          : NumberSet,
+            /// Whether or not a number is empty, i.e. it has an empty exponent
             empty        : bool,
+            /// The number value of the floating point number
             number       : Span,
+            /// The span of the exponent, if any. If there's no exponent, the start and end locations
+            /// will be the same value
             exponent     : Span,
+            /// The start location of the suffix i.e it would be 3 in `1.0usize`
             suffix_start : usize,
         },
+
         /// An integer, this can be of any type, hex, octal, binary, or a normal integer.
         Int {
+            /// The type of integer
             set          : NumberSet,
+            /// Whether or not an integer is empty, i.e 0x | 0b | 0o
             empty        : bool,
+            /// The start location of the suffix i.e it would be 1 in `1usize`
             suffix_start : usize,
         },
 
         /// Any of the string types defined in [`StrSet`]
         String { set: StrSet },
+
         /// Any of the character types defined in [`CharSet`]
         Char { closed: bool, set: CharSet },
 
@@ -277,6 +301,7 @@ pub mod lexer {
         ///
         /// Doc comments: `/** A multiline\n doc comment */`
         MultiLineComment { set: CommentSet, closed: bool, depth: usize },
+
         /// Single line comments
         ///
         /// Normal comments: `// <comment text>\n`
@@ -303,43 +328,81 @@ pub mod lexthrow {
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum StringValue {
+        /// The value of a string that has been escaped and been parsed
         String(String),
-        Span(Span),
+        /// The value of a string that has no escape sequences
+        Span  (Span),
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub enum StringType {
+    pub enum StringSet {
+        /// A normal character / string or raw string
         Normal,
+        /// A byte string or character
         Byte,
         // Raw type is not required here since there's nothing different about it when compared to
         // the normal string, for the parser
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    pub enum NumberType {
+    pub enum NumberKind {
+        /// A floating point number
         Float,
+        /// An unsigned integer, i.e. cannot be negative
         UnsignedInteger,
+        /// A normal integer
         Integer,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum NumberPrecision {
+        /// A u8 or i8
         Small  = 8,
+        /// A u16 or i16
         Medium = 16,
+        /// A u32, i32 or f32
         Normal = 32,
+        /// A u64, i64 or f64
         Large  = 64,
+        /// A u128
         Full   = 128,
+        /// A usize
         Max,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum Set {
-        String    (StringValue, StringType),
-        Char      (StringValue, StringType),
-        Number    (NumberType, NumberPrecision, NumberSet),
+        /// Strings
+        String {
+            /// The value of a string
+            value : StringValue,
+            /// The type of string
+            set   : StringSet,
+        },
+        /// Characters
+        Char   {
+            /// The value of a character
+            value : StringValue,
+            /// The type of character
+            set   : StringSet,
+        },
+        /// Numbers
+        Number {
+            /// The type of number, i.e. a floating point number, a unsigned integer, or a normal,
+            /// signed integer
+            kind      : NumberKind,
+            /// The precision of the number, basically the same things as Rust's number type system
+            precision : NumberPrecision,
+            /// The type of the number, weather a hexadecimal one, a binary one, an octal or just a
+            /// normal number
+            set       : NumberSet,
+            /// The exponent of a number, this can also be a negative exponent
+            exponent  : isize,
+        },
+        /// Delimiters
         Delimiter (Delimiters),
+        /// Identifiers and keywords, what else?
         Identifier,
-        Invalid,
     }
 
     impl Display for Set {
@@ -357,11 +420,11 @@ pub mod lexthrow {
 pub struct Token<S> {
     /// The token type, here called a set because parts of my keyboard is broken and it's harder to
     /// type in "token_type" than "set"
-    pub set: S,
+    pub set   : S,
     /// The position indexes referenced by the token
-    pub pos: Span,
+    pub pos   : Span,
     /// All the lines which this token spans
-    pub lines: Span,
+    pub lines : Span,
 }
 
 impl<S> Token<S> {
@@ -375,7 +438,7 @@ impl<S> Token<S> {
         where S: Display {
         format!(
             "Token(Type = {}, Value = {:?}, Pos = {}, Line = {})",
-            self.set, self.pos.to_src(src), self.pos, self.lines,
+            self.set, self.pos.as_src(src), self.pos, self.lines,
         )
     }
 }

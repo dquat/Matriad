@@ -48,4 +48,9 @@ color!(
     INFO_COLOR, Color::Reset,
     /// The color of empty lines
     EMPTY_COLOR, Color::Blue,
+    /// The color of file names
+    FILE_COLOR, Color::Magenta,
+
+    /// The color of a visualizer label
+    LABEL_COLOR, Color::White,
 );

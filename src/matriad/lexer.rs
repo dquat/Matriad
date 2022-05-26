@@ -99,9 +99,7 @@ impl<'a> Lexer<'a> {
     #[inline]
     fn adv_unchecked(&mut self) {
         match self.it.next() {
-            Some(_) => {
-                self.pos += 1;
-            },
+            Some(_) => self.pos += 1,
             None => return,
         };
     }
@@ -312,7 +310,14 @@ impl<'a> Lexer<'a> {
         let next_char = self.peek();
         // did not expect a random character between `r#` and `"`
         if next_char != '\"' {
-            return (start_hashes, RawStrErr::UnexpectedChar { unexpected: next_char });
+            let pos = self.pos;
+            self.adv();
+            return (
+                start_hashes,
+                RawStrErr::UnexpectedChar {
+                    unexpected : next_char,
+                    location   : pos,
+                });
         }
         self.adv_unchecked();
         let mut end_hashes = 0;
@@ -326,7 +331,7 @@ impl<'a> Lexer<'a> {
             if self.eof() {
                 return (start_hashes, RawStrErr::LacksHashes {
                     lacking : start_hashes - end_hashes,
-                    hint: (max_hashes, prev_pos)
+                    hint    : (max_hashes, prev_pos)
                 })
             }
             // Consume the closing quote

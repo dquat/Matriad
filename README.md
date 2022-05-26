@@ -15,8 +15,20 @@ Clone the source-code using git like so:
 git clone https://github.com/dquat/Matriad.git
 ```
 # Execution
-- This language is still not complete to the point where it's usable
-    - But, you can run the main file with: `cargo run --release`
+- This language is still not complete to the point where it's usable, but I've implemented the lexer for the most part, and you can try it out! I assume you want to look at the interesting errors more than the output though, which is very boring to look at.
+
+```bash
+# Format for running the code to check your file
+# Run it through cargo:
+cargo run --release <source_file> | <source_file.mrd>
+
+# Or build the executable and use it:
+cargo build --release
+cd ./target/release
+# Run the file
+./matriad <source_file> | <source_file.mrd>
+```
+
 # Aim
 This language aims to be a language that is:
 - Easy to learn and use
